@@ -1,0 +1,108 @@
+﻿@page "/day3"
+@using Microsoft.VisualBasic
+@using System.Text.RegularExpressions
+@inject IWebHostEnvironment WebHostEnvironment
+
+<PageTitle>Day @DayNumber</PageTitle>
+
+<div class="container-fluid">
+    <div class="d-flex justify-content-between">
+        <h1>Day @DayNumber</h1>
+
+        <div class="d-flex justify-content-around gap-4 flex-grow-1">
+            <h4 class="border border-primary p-1">Part1 Result: @Part1Result</h4>
+            <h4 class="border border-primary p-1">Part2 Result: @Part2Result</h4>
+        </div>
+
+        <div class="d-flex justify-content-end gap-2">
+            <button class="btn btn-primary" @onclick="Part1">Part 1</button>
+            <button class="btn btn-primary" @onclick="Part2" >Part 2</button>
+        </div>
+    </div>
+
+    <h2>Input</h2>
+    <div class="overflow-auto mb-2">
+        <div class="" style="width: 1600px; height: 300px;">
+            <table class="table table-bordered table-striped">
+                <tbody>
+                    @foreach (var line in Input)
+                    {
+                        <tr>
+                            <td>@line</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+
+</div>
+
+@code {
+    private const int DayNumber = 3;
+
+    private long Part1Result { get; set; } = 0;
+    private long Part2Result { get; set; } = 0;
+
+    private List<string> Input = new();
+
+    protected override void OnInitialized()
+    {
+        try
+        {
+            var filePath = Path.Combine(WebHostEnvironment.WebRootPath, $"day{DayNumber}.txt");
+            var file = File.ReadAllText(filePath);
+            Input =  file
+                .Split("\n")
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .ToList();
+        }
+        catch (Exception e)
+        {
+            Console.WriteLine(e);
+        }
+    }
+
+    private void Part1()
+    {
+        Regex r = new Regex(@"mul\([0-9]+,[0-9]+\)");
+
+        var instructions = Input
+            .Select(x => r.Matches(x).Select(s => s.Value).ToList())
+            .ToList();
+
+        Part1Result = instructions
+            .Select(x => x
+                .Select(s => s.Replace("mul(", string.Empty).TrimEnd(')').Split(','))
+                .Select(s => long.Parse(s[0]) * long.Parse(s[1]))
+                .Sum())
+            .Sum();
+    }
+
+    private void Part2()
+    {
+        Regex r = new Regex(@"mul\([0-9]+,[0-9]+\)");
+
+        var input = new string(Input.SelectMany(x => x).ToArray());
+        input = input.Replace("do()", "\ndo()").Replace("don't()", "\ndon't()");
+        input = "do()" + input;
+
+        var rows = input.Split("\n");
+
+        var commands = rows.Where(x => x.StartsWith("do()")).ToList();
+
+        var instructions = commands
+            .Select(x => r.Matches(x).Select(s => s.Value).ToList())
+            .ToList();
+
+        Part2Result = instructions
+            .Select(x => x
+                .Select(s => s.Replace("mul(", string.Empty).TrimEnd(')').Split(','))
+                .Select(s => long.Parse(s[0]) * long.Parse(s[1]))
+                .Sum())
+            .Sum();
+
+
+    }
+}

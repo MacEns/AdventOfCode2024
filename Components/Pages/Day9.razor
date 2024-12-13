@@ -1,0 +1,211 @@
+﻿@page "/day9"
+@inject IWebHostEnvironment WebHostEnvironment
+
+<PageTitle>Day @DayNumber</PageTitle>
+
+<div class="container-fluid">
+    <div class="d-flex justify-content-start">
+        <h1>Day @DayNumber</h1>
+
+        <div class="d-flex justify-content-start gap-4 flex-grow-1">
+            <h4 class="border border-primary p-1">Part1 Result: @Part1Result</h4>
+            <h4 class="border border-primary p-1">Part2 Result: @Part2Result</h4>
+        </div>
+
+        <div class="d-flex justify-content-end gap-2">
+            <button class="btn btn-primary" @onclick="Part1">Part 1</button>
+            <button class="btn btn-primary" @onclick="Part2" >Part 2</button>
+        </div>
+    </div>
+</div>
+
+<div class="w-100">
+    @if (false && Blocks.Any())
+    {
+        <p class="" style="font-family: Consolas; font-size: 12px">
+            Blocks:
+            @foreach (var block in Blocks)
+            {
+                <span>@(block == -1 ? "." : block) | </span>
+            }
+        </p>
+    }
+
+    @if (SortedBlocks.Any())
+    {
+        <p class="" style="font-family: Consolas; font-size: 12px">
+            Sorted:
+            @foreach (var block in SortedBlocks)
+            {
+                <span>@(block == -1 ? "." : block) | </span>
+            }
+        </p>
+    }
+
+    @if (FileBlocks.Any())
+    {
+        <p>FileBlocks: @FileBlocks.Count</p>
+    }
+</div>
+
+@code {
+    private const int DayNumber = 9;
+
+    private long Part1Result { get; set; } = 0;
+    private long Part2Result { get; set; } = 0;
+
+    private List<string> Input = new();
+    private List<FileBlock> FileBlocks = new();
+    private List<long> Blocks = new();
+    private List<long> SortedBlocks = new();
+
+    protected override void OnInitialized()
+    {
+        try
+        {
+            var filePath = Path.Combine(WebHostEnvironment.WebRootPath, $"day{DayNumber}.txt");
+            var file = File.ReadAllText(filePath);
+            Input =  file
+                .Split("\n")
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .ToList();
+        }
+        catch (Exception e)
+        {
+            Console.WriteLine(e);
+        }
+    }
+
+    private void Part1()
+    {
+        var chars = Input[0].Index().ToList();
+        FileBlocks = new();
+        foreach (var c in chars)
+        {
+            if (char.IsDigit(c.Item))
+            {
+                var id = c.Index / 2;
+                var size = c.Item - '0';
+                var isGap = c.Index % 2 == 1;
+                FileBlocks.Add(new(id, size, isGap));
+            }
+        }
+
+        Blocks = FileBlocks
+            .SelectMany(x => Enumerable.Range(0, x.Size).Select(_ => x.IsGap ? -1L : x.Id))
+            .ToList();
+
+        SortedBlocks = Blocks.ToList();
+        var frontIndex = 0;
+        var backIndex = SortedBlocks.Count - 1;
+
+        while (frontIndex < backIndex)
+        {
+            if (SortedBlocks[frontIndex] != -1)
+            {
+                frontIndex++;
+            }
+            else if (SortedBlocks[backIndex] == -1)
+            {
+                backIndex--;
+            }
+            else
+            {
+                var temp = SortedBlocks[frontIndex];
+                SortedBlocks[frontIndex] = SortedBlocks[backIndex];
+                SortedBlocks[backIndex] = temp;
+                frontIndex++;
+                backIndex--;
+            }
+        }
+
+
+        Part1Result = SortedBlocks
+            .Where(x => x >= 0)
+            .Index()
+            .Select(x => x.Item * x.Index)
+            .Sum();
+    }
+
+    private async Task Part2()
+    {
+        var chars = Input[0].Index().ToList();
+        FileBlocks = new();
+        foreach (var c in chars)
+        {
+            if (char.IsDigit(c.Item))
+            {
+                var id = c.Index / 2;
+                var size = c.Item - '0';
+                var isGap = c.Index % 2 == 1;
+                FileBlocks.Add(new(id, size, isGap));
+            }
+        }
+
+        var sortedBlocks = FileBlocks.ToList();
+
+        var frontIndex = 0;
+        var rearIndex = sortedBlocks.Count - 1;
+
+        while(rearIndex > 0)
+        {
+            if (rearIndex % 50 == 0)
+            {
+                Part2Result = rearIndex;
+                await InvokeAsync(StateHasChanged);
+                await Task.Delay(1);
+            }
+
+            if (sortedBlocks[rearIndex].IsGap)
+            {
+                rearIndex--;
+                continue;
+            }
+
+            var block = sortedBlocks[rearIndex];
+            (frontIndex, var gap) = sortedBlocks.Index().FirstOrDefault(x => x.Item.IsGap && x.Item.Size >= block.Size && x.Index < rearIndex);
+
+            if (gap == null)
+            {
+                rearIndex--;
+                continue;
+            }
+
+            var sizeDifference = gap.Size - block.Size;
+            if (sizeDifference == 0)
+            {
+                sortedBlocks[frontIndex] = block;
+                sortedBlocks[rearIndex] = gap;
+                rearIndex--;
+                continue;
+            }
+
+            var newGapFront = new FileBlock(gap.Id, sizeDifference, true);
+            var newGapRear = new FileBlock(gap.Id, gap.Size - sizeDifference, true);
+
+            sortedBlocks.Remove(block);
+            sortedBlocks.Remove(gap);
+            sortedBlocks.Insert(frontIndex, block);
+            sortedBlocks.Insert(frontIndex + 1, newGapFront);
+            sortedBlocks.Insert(rearIndex + 1, newGapRear);
+        }
+
+
+        Blocks = FileBlocks
+            .SelectMany(x => Enumerable.Range(0, x.Size).Select(_ => x.IsGap ? -1L : x.Id))
+            .ToList();
+
+        SortedBlocks = sortedBlocks
+            .SelectMany(x => Enumerable.Range(0, x.Size).Select(_ => x.IsGap ? -1L : x.Id))
+            .ToList();
+
+
+        Part2Result = SortedBlocks
+            .Index()
+            .Select(x => x.Item > 0 ? x.Item * x.Index : 0)
+            .Sum();
+    }
+
+    private record FileBlock(int Id, int Size, bool IsGap);
+
+}

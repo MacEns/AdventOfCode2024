@@ -1,0 +1,269 @@
+﻿@page "/day6"
+@using System.Data
+@inject IWebHostEnvironment WebHostEnvironment
+
+<PageTitle>Day @DayNumber</PageTitle>
+
+<div class="container-fluid">
+    <div class="d-flex justify-content-start gap-4 w-75">
+        <h1>Day @DayNumber</h1>
+
+        <div class="d-flex justify-content-around gap-4 flex-grow-1">
+            <h4 class="border border-primary p-1">Part1 Result: @Part1Result</h4>
+            <h4 class="border border-primary p-1">Part2 Result: @Part2Result</h4>
+        </div>
+
+        <div class="d-flex justify-content-end gap-2">
+            <button class="btn btn-primary" @onclick="Part1">Part 1</button>
+            <button class="btn btn-primary" @onclick="Part2" >Part 2</button>
+        </div>
+    </div>
+
+    <p>On variation @CurrentVariation / @VariationCount</p>
+    <p>Grid Size: @Characters.Count x @Characters[0].Count</p>
+
+    <table class="table table-sm table-bordered">
+        <tbody>
+        @for (var rowIdx = 0; rowIdx < Characters.Count; rowIdx++)
+        {
+            var row = Characters[rowIdx];
+
+            <tr style="font-family: Consolas; font-size:  8px">
+                @for (var colIdx = 0; colIdx < Characters[rowIdx].Count; colIdx++)
+                {
+                    var c = row[colIdx];
+                    var cellClass = rowIdx == StartRow && colIdx == StartCol
+                        ? "table-primary"
+                        : DirectionChars.Contains(c) || c == 'X' ? "table-success" : string.Empty;
+                    var colClass = c == 'X' ? "table-danger " : string.Empty;
+
+                    <td class="@colClass @cellClass">@c</td>
+                }
+            </tr>
+        }
+        </tbody>
+    </table>
+
+</div>
+
+@code {
+    private const int DayNumber = 6;
+
+    private long Part1Result { get; set; } = 0;
+    private long Part2Result { get; set; } = 0;
+
+    private List<string> Input = new();
+
+    private List<List<char>> Characters = [];
+    private readonly List<char> DirectionChars = [ '^', '>', '<', 'v' ];
+
+    private int StartRow = 0;
+    private int StartCol = 0;
+    private Direction StartDirection = Direction.Up;
+    private List<Point> VisitedSpaces = new();
+    private int CurrentVariation = 0;
+    private int VariationCount = 0;
+
+    protected override void OnInitialized()
+    {
+        try
+        {
+            var filePath = Path.Combine(WebHostEnvironment.WebRootPath, $"day{DayNumber}.txt");
+            var file = File.ReadAllText(filePath);
+            Input =  file
+                .Split("\n")
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .ToList();
+            Characters = Input.Select(x => ("+" + x + "+").ToList()).ToList();
+            var extraRow = Characters.First().Select(_ => '+').ToList();
+            Characters = Characters
+                .Prepend(extraRow)
+                .Append(extraRow)
+                .ToList();
+
+            var directionChar = DirectionChars.FirstOrDefault(x => Characters.Any(c => c.Contains(x)));
+            StartRow = Characters.Index().FirstOrDefault(x => x.Item.Any(c => c == directionChar)).Index;
+            StartCol = Characters[StartRow].IndexOf(directionChar);
+        }
+        catch (Exception e)
+        {
+            Console.WriteLine(e);
+        }
+    }
+
+    private void Part1()
+    {
+        InitCharacters();
+        var travelPath = GetPath(Characters).DistinctBy(x => $"{x.Row}|{x.Col}").ToList();
+        InitCharacters();
+
+        var directionChar = DirectionChars.FirstOrDefault(x => Characters.Any(c => c.Contains(x)));
+        var curDir = GetDirection(directionChar);
+        var curRow = Characters.Index().FirstOrDefault(x => x.Item.Any(c => c == directionChar)).Index;
+        var curCol = Characters[curRow].IndexOf(directionChar);
+        var curChar = Characters[curRow][curCol];
+
+        while (curChar != '+')
+        {
+            Characters[curRow][curCol] = 'X';
+            var (nextRow, nextcol) = NextPosition(curRow, curCol, curDir);
+            var nextChar = Characters[nextRow][nextcol];
+            if (nextChar == '#')
+            {
+                curDir = GetNextDirection(curDir);
+                continue;
+            }
+
+            curRow = nextRow;
+            curCol = nextcol;
+            curChar = Characters[curRow][curCol];
+        }
+
+        Console.WriteLine($"Path: {travelPath.Count}");
+        Part1Result = Characters.SelectMany(x => x).Count(x => x == 'X');
+        Console.WriteLine($"Part1: {Part1Result}");
+    }
+
+    private async Task Part2()
+    {
+        InitCharacters();
+        var travelPath = GetPath(Characters);
+        InitCharacters();
+
+        var variations = travelPath
+            .DistinctBy(x => $"{x.Row}|{x.Col}")
+            .Select(x =>
+            {
+                var grid = Characters.Select(y => y.ToList()).ToList();
+                grid[x.Row][x.Col] = '#';
+                return grid;
+            })
+            .Distinct()
+            .ToList();
+        VariationCount = variations.Count;
+        CurrentVariation = 0;
+
+        await InvokeAsync(StateHasChanged);
+        await Task.Delay(1);
+
+        Part2Result = 0;
+        foreach (var variation in variations)
+        {
+            var path = GetPath(variation);
+            if (path.Count == 0)
+            {
+                Part2Result ++;
+            }
+
+            if (CurrentVariation % 50 == 0)
+            {
+                Console.WriteLine($"Variation {CurrentVariation} / {VariationCount} Complete");
+                await InvokeAsync(StateHasChanged);
+                await Task.Delay(1);
+            }
+
+            CurrentVariation++;
+        }
+
+    }
+
+    private List<Point> GetPath(List<List<char>> grid)
+    {
+        var curDir = StartDirection;
+        var curRow = StartRow;
+        var curCol = StartCol;
+        var curChar = grid[StartRow][StartCol];
+        var travelPath = new List<Point>();
+
+        while (curChar != '+')
+        {
+            if (travelPath.Any(x => x.Col == curCol && x.Row == curRow && x.Direction == curDir))
+            {
+                return [];
+            }
+
+            travelPath.Add(new Point(curRow, curCol, curDir));
+            var (nextRow, nextcol) = NextPosition(curRow, curCol, curDir);
+            var nextChar = grid[nextRow][nextcol];
+            if (nextChar == '#')
+            {
+                curDir = GetNextDirection(curDir);
+                continue;
+            }
+
+            curRow = nextRow;
+            curCol = nextcol;
+            curChar = grid[curRow][curCol];
+        }
+
+        return travelPath;
+    }
+
+    private void InitCharacters()
+    {
+        Characters = Input.Select(x => ("+" + x + "+").ToList()).ToList();
+        var extraRow = Characters.First().Select(_ => '+').ToList();
+        Characters = Characters
+            .Prepend(extraRow)
+            .Append(extraRow)
+            .ToList();
+
+
+        var directionChar = DirectionChars.FirstOrDefault(x => Characters.Any(c => c.Contains(x)));
+        StartDirection = GetDirection(directionChar);
+        StartRow = Characters.Index().FirstOrDefault(x => x.Item.Any(c => c == directionChar)).Index;
+        StartCol = Characters[StartRow].IndexOf(directionChar);
+
+    }
+
+    private Direction GetDirection(char c) => c switch
+        {
+            '^' => Direction.Up,
+            '>' => Direction.Right,
+            'v' => Direction.Down,
+            _ => Direction.Left,
+        };
+
+    private char GetDirectionChar(Direction d) => d switch
+        {
+            Direction.Up => '^',
+            Direction.Right => '>',
+            Direction.Down => 'v',
+            _ => '<',
+        };
+
+    private Direction GetNextDirection(Direction currentDirection) => currentDirection switch
+        {
+            Direction.Up => Direction.Right,
+            Direction.Right => Direction.Down,
+            Direction.Down => Direction.Left,
+            _ => Direction.Up,
+        };
+
+    private (int RowIdx, int ColIdx) NextPosition(int rowIdx, int colIdx, Direction direction)
+    {
+        return direction switch
+        {
+            Direction.Up => (rowIdx - 1, colIdx),
+            Direction.Right => (rowIdx, colIdx + 1),
+            Direction.Down => (rowIdx + 1, colIdx),
+            Direction.Left => (rowIdx, colIdx - 1),
+            _ => (rowIdx, colIdx),
+        };
+    }
+
+    private enum Direction
+    {
+        Up,
+        Right,
+        Down,
+        Left,
+    }
+
+    private struct Point(int row, int col, Direction direction)
+    {
+        public int Row { get; set; } = row;
+        public int Col { get; set; } = col;
+        public Direction Direction { get; set; } = direction;
+    }
+}

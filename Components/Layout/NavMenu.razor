@@ -1,0 +1,22 @@
+﻿<div class="top-row ps-3 navbar navbar-dark">
+    <div class="container-fluid">
+        <a class="navbar-brand" href="">Advent Of Code</a>
+    </div>
+</div>
+
+<input type="checkbox" title="Navigation menu" class="navbar-toggler" />
+
+<div class="nav-scrollable" onclick="document.querySelector('.navbar-toggler').click()">
+    <nav class="flex-column">
+        @foreach (var day in Enumerable.Range(1, days))
+        {
+            <div class="nav-item ps-3 py-0 my-0">
+                <NavLink class="nav-link py-0 my-0" href="@($"day{day}")">@day</NavLink>
+            </div>
+        }
+    </nav>
+</div>
+
+@code {
+    private int days = 25;
+}

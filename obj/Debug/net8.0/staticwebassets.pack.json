@@ -1,0 +1,85 @@
+{
+  "Files": [
+    {
+      "Id": "C:\\Users\\mens\\source\\repos\\AdventOfCode\\obj\\Debug\\net8.0\\scopedcss\\projectbundle\\AdventOfCode.bundle.scp.css",
+      "PackagePath": "staticwebassets\\AdventOfCode.pkpf0k21lc.bundle.scp.css"
+    },
+    {
+      "Id": "C:\\Users\\mens\\source\\repos\\AdventOfCode\\wwwroot\\app.css",
+      "PackagePath": "staticwebassets\\app.css"
+    },
+    {
+      "Id": "C:\\Users\\mens\\source\\repos\\AdventOfCode\\wwwroot\\bootstrap\\bootstrap.min.css",
+      "PackagePath": "staticwebassets\\bootstrap\\bootstrap.min.css"
+    },
+    {
+      "Id": "C:\\Users\\mens\\source\\repos\\AdventOfCode\\wwwroot\\bootstrap\\bootstrap.min.css.map",
+      "PackagePath": "staticwebassets\\bootstrap\\bootstrap.min.css.map"
+    },
+    {
+      "Id": "C:\\Users\\mens\\source\\repos\\AdventOfCode\\wwwroot\\day0.txt",
+      "PackagePath": "staticwebassets\\day0.txt"
+    },
+    {
+      "Id": "C:\\Users\\mens\\source\\repos\\AdventOfCode\\wwwroot\\day1.txt",
+      "PackagePath": "staticwebassets\\day1.txt"
+    },
+    {
+      "Id": "C:\\Users\\mens\\source\\repos\\AdventOfCode\\wwwroot\\day2.txt",
+      "PackagePath": "staticwebassets\\day2.txt"
+    },
+    {
+      "Id": "C:\\Users\\mens\\source\\repos\\AdventOfCode\\wwwroot\\favicon.png",
+      "PackagePath": "staticwebassets\\favicon.png"
+    },
+    {
+      "Id": "C:\\Users\\mens\\source\\repos\\AdventOfCode\\wwwroot\\images\\horizontal.svg",
+      "PackagePath": "staticwebassets\\images\\horizontal.svg"
+    },
+    {
+      "Id": "C:\\Users\\mens\\source\\repos\\AdventOfCode\\wwwroot\\images\\northeast.svg",
+      "PackagePath": "staticwebassets\\images\\northeast.svg"
+    },
+    {
+      "Id": "C:\\Users\\mens\\source\\repos\\AdventOfCode\\wwwroot\\images\\northwest.svg",
+      "PackagePath": "staticwebassets\\images\\northwest.svg"
+    },
+    {
+      "Id": "C:\\Users\\mens\\source\\repos\\AdventOfCode\\wwwroot\\images\\southeast.svg",
+      "PackagePath": "staticwebassets\\images\\southeast.svg"
+    },
+    {
+      "Id": "C:\\Users\\mens\\source\\repos\\AdventOfCode\\wwwroot\\images\\southwest.svg",
+      "PackagePath": "staticwebassets\\images\\southwest.svg"
+    },
+    {
+      "Id": "C:\\Users\\mens\\source\\repos\\AdventOfCode\\wwwroot\\images\\start.svg",
+      "PackagePath": "staticwebassets\\images\\start.svg"
+    },
+    {
+      "Id": "C:\\Users\\mens\\source\\repos\\AdventOfCode\\wwwroot\\images\\vertical.svg",
+      "PackagePath": "staticwebassets\\images\\vertical.svg"
+    },
+    {
+      "Id": "obj\\Debug\\net8.0\\staticwebassets\\msbuild.AdventOfCode.Microsoft.AspNetCore.StaticWebAssetEndpoints.props",
+      "PackagePath": "build\\Microsoft.AspNetCore.StaticWebAssetEndpoints.props"
+    },
+    {
+      "Id": "obj\\Debug\\net8.0\\staticwebassets\\msbuild.AdventOfCode.Microsoft.AspNetCore.StaticWebAssets.props",
+      "PackagePath": "build\\Microsoft.AspNetCore.StaticWebAssets.props"
+    },
+    {
+      "Id": "obj\\Debug\\net8.0\\staticwebassets\\msbuild.build.AdventOfCode.props",
+      "PackagePath": "build\\AdventOfCode.props"
+    },
+    {
+      "Id": "obj\\Debug\\net8.0\\staticwebassets\\msbuild.buildMultiTargeting.AdventOfCode.props",
+      "PackagePath": "buildMultiTargeting\\AdventOfCode.props"
+    },
+    {
+      "Id": "obj\\Debug\\net8.0\\staticwebassets\\msbuild.buildTransitive.AdventOfCode.props",
+      "PackagePath": "buildTransitive\\AdventOfCode.props"
+    }
+  ],
+  "ElementsToRemove": []
+}

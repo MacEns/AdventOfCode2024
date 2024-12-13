@@ -1,0 +1,191 @@
+﻿@page "/day4"
+@inject IWebHostEnvironment WebHostEnvironment
+
+<PageTitle>Day @DayNumber</PageTitle>
+
+<div class="container-fluid">
+    <div class="d-flex justify-content-between">
+        <h1>Day @DayNumber</h1>
+
+        <div class="d-flex justify-content-around gap-4 flex-grow-1">
+            <h4 class="border border-primary p-1">Part1 Result: @Part1Result</h4>
+            <h4 class="border border-primary p-1">Part2 Result: @Part2Result</h4>
+        </div>
+
+        <div class="d-flex justify-content-end gap-2">
+            <button class="btn btn-primary" @onclick="Part1">Part 1</button>
+            <button class="btn btn-primary" @onclick="Part2" >Part 2</button>
+        </div>
+    </div>
+
+    @foreach (var row in Characters)
+    {
+        <p class="my-0 py-0" style="font-family: Consolas">
+            @(new string(row.ToArray()))
+        </p>
+    }
+
+</div>
+
+@code {
+    private const int DayNumber = 4;
+
+    private long Part1Result { get; set; } = 0;
+    private long Part2Result { get; set; } = 0;
+
+    private List<string> Input = new();
+
+    private List<List<char>> Characters = [];
+
+    protected override void OnInitialized()
+    {
+        try
+        {
+            var filePath = Path.Combine(WebHostEnvironment.WebRootPath, $"day{DayNumber}.txt");
+            var file = File.ReadAllText(filePath);
+            Input =  file
+                .Split("\n")
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .ToList();
+            Characters = Input
+                .Select(x => ("..." + x + "...").ToList())
+                .ToList();
+            var extraRow = Characters.First().Select(_ => '.').ToList();
+            Characters = Characters
+                .Prepend(extraRow)
+                .Prepend(extraRow)
+                .Prepend(extraRow)
+                .Append(extraRow)
+                .Append(extraRow)
+                .Append(extraRow)
+                .ToList();
+
+        }
+        catch (Exception e)
+        {
+            Console.WriteLine(e);
+        }
+    }
+
+    private void Part1()
+    {
+        Part1Result = 0;
+        for (int x = 3; x < Characters.Count - 3; x++)
+        {
+            for (int y = 3; y < Characters[x].Count - 3; y++)
+            {
+                var current = Characters[x][y];
+                if (current != 'X')
+                {
+                    continue;
+                }
+
+                Part1Result += MatchCount(x, y, Characters);
+            }
+        }
+    }
+
+    private void Part2()
+    {
+        Part2Result = 0;
+        for (int x = 3; x < Characters.Count - 3; x++)
+        {
+            for (int y = 3; y < Characters[x].Count - 3; y++)
+            {
+                var current = Characters[x][y];
+                if (current == 'A' && IsXmas(x, y, Characters))
+                {
+                    Part2Result++;
+                }
+
+            }
+        }
+    }
+
+    private bool IsXmas(int x, int y, List<List<char>> characters)
+    {
+        var upLeft = GetNextChar(x, y, Direction.UpLeft, Characters);
+        var upRight = GetNextChar(x, y, Direction.UpRight, Characters);
+        var downLeft = GetNextChar(x, y, Direction.DownLeft, Characters);
+        var downRight = GetNextChar(x, y, Direction.DownRight, Characters);
+
+        return characters[x][y] == 'A'
+            && (upLeft == 'M' && downRight == 'S' || upLeft == 'S' && downRight == 'M')
+            && (upRight == 'M' && downLeft == 'S' || upRight == 'S' && downLeft == 'M');
+    }
+    
+    private int MatchCount(int startX, int startY, List<List<char>> characters, char currentChar = 'X')
+    {
+        return Enum.GetValues<Direction>().Count(direction => IsMatch(startX, startY, direction, characters, currentChar));
+    }
+    
+    private bool IsMatch(int x, int y, Direction direction, List<List<char>> characters, char previous)
+    {
+        if (previous == 'S')
+        {
+            return true;
+        }
+        
+        var neededChar = previous switch
+        {
+            'X' => 'M',
+            'M' => 'A',
+            'A' => 'S',
+            _ => ' '
+        };
+
+        var currentChar = GetNextChar(x, y, direction, characters);
+
+        if (currentChar == neededChar)
+        {
+            var next = NextPosition(x, y, direction);
+            return IsMatch(next.X, next.Y, direction, characters, currentChar);
+        }
+
+        return false;
+    }
+
+    private (int X, int Y) NextPosition(int x, int y, Direction direction)
+    {
+        return direction switch
+        {
+            Direction.Up => (x, y - 1),
+            Direction.UpRight => (x + 1, y - 1),
+            Direction.Right => (x + 1, y),
+            Direction.DownRight => (x + 1, y + 1),
+            Direction.Down => (x, y + 1),
+            Direction.DownLeft => (x - 1, y + 1),
+            Direction.Left => (x - 1, y),
+            Direction.UpLeft => (x - 1, y - 1),
+            _ => (x, y),
+        };
+    }
+    
+    private char GetNextChar(int x, int y, Direction direction, List<List<char>> characters)
+    {
+        return direction switch
+        {
+            Direction.Up => characters[x][y - 1],
+            Direction.UpRight => characters[x + 1][y - 1],
+            Direction.Right => characters[x + 1][y],
+            Direction.DownRight => characters[x + 1][y + 1],
+            Direction.Down => characters[x][y + 1],
+            Direction.DownLeft => characters[x - 1][y + 1],
+            Direction.Left => characters[x - 1][y],
+            Direction.UpLeft => characters[x - 1][y - 1],
+            _ => throw new ArgumentOutOfRangeException(nameof(direction), direction, null)
+        };
+    }
+    
+    private enum Direction
+    {
+        Up,
+        UpRight,
+        Right,
+        DownRight,
+        Down,
+        DownLeft,
+        Left,
+        UpLeft,
+    }
+}

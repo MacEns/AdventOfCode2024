@@ -1,0 +1,178 @@
+﻿@page "/day13"
+@inject IWebHostEnvironment WebHostEnvironment
+
+<PageTitle>Day @DayNumber</PageTitle>
+
+<div class="container-fluid">
+    <div class="d-flex justify-content-between">
+        <h1>Day @DayNumber</h1>
+
+        <div class="d-flex justify-content-around gap-4 flex-grow-1">
+            <h4 class="border border-primary p-1">Part1 Result: @Part1Result</h4>
+            <h4 class="border border-primary p-1">Part2 Result: @Part2Result</h4>
+        </div>
+
+        <div class="d-flex justify-content-end gap-2">
+            <button class="btn btn-primary" @onclick="Part1">Part 1</button>
+            <button class="btn btn-primary" @onclick="Part2" >Part 2</button>
+        </div>
+    </div>
+
+    <p>ClawMachines: @ClawMachines.Count</p>
+
+    <table class="table table-sm table-bordered table-striped w-75">
+        <thead>
+            <tr>
+                <th>Index</th>
+                <th>Prize</th>
+                <th>A</th>
+                <th>B</th>
+                <th>Winners</th>
+                <th>Possibilities</th>
+                <th>Token Cost</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var clawMachine in ClawMachines)
+            {
+                var winners = GetPossibleWinningCombos(clawMachine);
+
+                <tr class="@(winners.Count > 0 ? "table-success" : string.Empty)">
+                    <td>@clawMachine.Id</td>
+                    <td>@clawMachine.PrizeLocation</td>
+                    <td>@clawMachine.AButton</td>
+                    <td>@clawMachine.BButton</td>
+                    <td>@(winners.Count > 0 ? winners.Count : string.Empty)</td>
+                    <td>
+                        @if (winners.Count > 0)
+                        {
+                            @foreach (var win in winners)
+                            {
+                                var aPosition = new LkVector2(win.APresses * clawMachine.AButton.X, win.APresses * clawMachine.AButton.Y);
+                                var bPosition = new LkVector2(win.BPresses * clawMachine.BButton.X, win.BPresses * clawMachine.BButton.Y);
+                                var finalPosition = aPosition + bPosition;
+                                <p class="my-0">@($"A: {win.APresses} B: {win.BPresses} => ({aPosition.X}+{bPosition.X}, {aPosition.Y}+{bPosition.Y}) = {finalPosition}")</p>
+                            }
+                        }
+                    </td>
+                    <td>@GetMinimumTokenCost(clawMachine)</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+
+</div>
+
+@code {
+    private const int DayNumber = 13;
+
+    private long Part1Result { get; set; } = 0;
+    private long Part2Result { get; set; } = 0;
+
+    private List<string> Input = new();
+    private List<ClawMachine> ClawMachines = new();
+
+    protected override void OnInitialized()
+    {
+        try
+        {
+            var filePath = Path.Combine(WebHostEnvironment.WebRootPath, $"day{DayNumber}.txt");
+            var file = File.ReadAllText(filePath);
+            Input =  file
+                .Split("\n")
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .ToList();
+        }
+        catch (Exception e)
+        {
+            Console.WriteLine(e);
+        }
+    }
+
+    private void LoadClawMachines()
+    {
+        ClawMachines = [];
+        var machines = Input.Chunk(3);
+        foreach (var (i, chunk) in machines.Index())
+        {
+            var a = GetVectorFromLine(chunk[0]);
+            var b = GetVectorFromLine(chunk[1]);
+            var prize = GetVectorFromLine(chunk[2]);
+            ClawMachines.Add(new ClawMachine(i, prize, a, b));
+        }
+    }
+
+    private static LkVector2 GetVectorFromLine(string line)
+    {
+        var parts = line
+            .Split(':')
+            .LastOrDefault()
+            .Split(',')
+            .Select(x => decimal.Parse(x.Replace("X", string.Empty).Replace("Y", string.Empty).Replace("+", string.Empty).Replace("=", string.Empty).Trim()))
+            .ToList();
+        return new LkVector2(parts[0],parts[1]);
+    }
+
+    private void Part1()
+    {
+        LoadClawMachines();
+
+        Part1Result = ClawMachines.Sum(x => GetMinimumTokenCost(x, 100));
+    }
+
+    private void Part2()
+    {
+        LoadClawMachines();
+        foreach (var machine in ClawMachines)
+        {
+            machine.PrizeLocation += 10000000000000L * new LkVector2(1, 1);
+        }
+
+        Part2Result = ClawMachines.Sum(x => GetMinimumTokenCost(x));
+    }
+
+    private static List<(long APresses, long BPresses)> GetPossibleWinningCombos(ClawMachine c, int maxPresses = 0)
+    {
+        var locX = (long)c.PrizeLocation.X;
+        var locY = (long)c.PrizeLocation.Y;
+        var aX = (long)c.AButton.X;
+        var aY = (long)c.AButton.Y;
+        var bX = (long)c.BButton.X;
+        var bY = (long)c.BButton.Y;
+
+        if (aX * bY == aY * bX || aX == 0)
+        {
+            return [];
+        }
+
+        var possibleWinningCombos = new List<(long APresses, long BPresses)>();
+        var b = (aX * locY - aY * locX) / (aX * bY - aY * bX);
+        var a = (locX - b * bX) / aX;
+
+        if (XFunc(a, b) && YFunc(a, b) && (maxPresses <= 0 || a <= maxPresses && b <= maxPresses))
+        {
+            possibleWinningCombos.Add((a, b));
+        }
+
+        return possibleWinningCombos;
+
+        bool XFunc(long A, long B) => c.AButton.X * A + c.BButton.X * B == locX;
+        bool YFunc(long A, long B) => c.AButton.Y * A + c.BButton.Y * B == locY;
+    }
+
+    private static long TokenCost(long a, long b) => a * 3 + b;
+
+    private static long GetMinimumTokenCost(ClawMachine m, int maxButtons = 0)
+    {
+        var winners = GetPossibleWinningCombos(m, maxButtons);
+        return winners.Count == 0 ? 0 : winners.Select(x => TokenCost(x.APresses, x.BPresses)).Min();
+    }
+
+    private class ClawMachine(int id, LkVector2 prizeLocation, LkVector2 aButton, LkVector2 bButton)
+    {
+        public int Id { get; set; } = id;
+        public LkVector2 PrizeLocation { get; set; } = prizeLocation;
+        public LkVector2 AButton { get; set; } = aButton;
+        public LkVector2 BButton { get; set; } = bButton;
+    }
+}

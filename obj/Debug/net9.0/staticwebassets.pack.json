@@ -1,0 +1,129 @@
+{
+  "Files": [
+    {
+      "Id": "C:\\Users\\mens\\source\\repos\\AdventOfCode\\obj\\Debug\\net9.0\\scopedcss\\projectbundle\\AdventOfCode.bundle.scp.css",
+      "PackagePath": "staticwebassets\\AdventOfCode.pkpf0k21lc.bundle.scp.css"
+    },
+    {
+      "Id": "C:\\Users\\mens\\source\\repos\\AdventOfCode\\wwwroot\\app.css",
+      "PackagePath": "staticwebassets\\app.css"
+    },
+    {
+      "Id": "C:\\Users\\mens\\source\\repos\\AdventOfCode\\wwwroot\\bootstrap\\bootstrap.min.css",
+      "PackagePath": "staticwebassets\\bootstrap\\bootstrap.min.css"
+    },
+    {
+      "Id": "C:\\Users\\mens\\source\\repos\\AdventOfCode\\wwwroot\\bootstrap\\bootstrap.min.css.map",
+      "PackagePath": "staticwebassets\\bootstrap\\bootstrap.min.css.map"
+    },
+    {
+      "Id": "C:\\Users\\mens\\source\\repos\\AdventOfCode\\wwwroot\\day0.txt",
+      "PackagePath": "staticwebassets\\day0.txt"
+    },
+    {
+      "Id": "C:\\Users\\mens\\source\\repos\\AdventOfCode\\wwwroot\\day1.txt",
+      "PackagePath": "staticwebassets\\day1.txt"
+    },
+    {
+      "Id": "C:\\Users\\mens\\source\\repos\\AdventOfCode\\wwwroot\\day10.txt",
+      "PackagePath": "staticwebassets\\day10.txt"
+    },
+    {
+      "Id": "C:\\Users\\mens\\source\\repos\\AdventOfCode\\wwwroot\\day11.txt",
+      "PackagePath": "staticwebassets\\day11.txt"
+    },
+    {
+      "Id": "C:\\Users\\mens\\source\\repos\\AdventOfCode\\wwwroot\\day12.txt",
+      "PackagePath": "staticwebassets\\day12.txt"
+    },
+    {
+      "Id": "C:\\Users\\mens\\source\\repos\\AdventOfCode\\wwwroot\\day13.txt",
+      "PackagePath": "staticwebassets\\day13.txt"
+    },
+    {
+      "Id": "C:\\Users\\mens\\source\\repos\\AdventOfCode\\wwwroot\\day2.txt",
+      "PackagePath": "staticwebassets\\day2.txt"
+    },
+    {
+      "Id": "C:\\Users\\mens\\source\\repos\\AdventOfCode\\wwwroot\\day3.txt",
+      "PackagePath": "staticwebassets\\day3.txt"
+    },
+    {
+      "Id": "C:\\Users\\mens\\source\\repos\\AdventOfCode\\wwwroot\\day4.txt",
+      "PackagePath": "staticwebassets\\day4.txt"
+    },
+    {
+      "Id": "C:\\Users\\mens\\source\\repos\\AdventOfCode\\wwwroot\\day5.txt",
+      "PackagePath": "staticwebassets\\day5.txt"
+    },
+    {
+      "Id": "C:\\Users\\mens\\source\\repos\\AdventOfCode\\wwwroot\\day6.txt",
+      "PackagePath": "staticwebassets\\day6.txt"
+    },
+    {
+      "Id": "C:\\Users\\mens\\source\\repos\\AdventOfCode\\wwwroot\\day7.txt",
+      "PackagePath": "staticwebassets\\day7.txt"
+    },
+    {
+      "Id": "C:\\Users\\mens\\source\\repos\\AdventOfCode\\wwwroot\\day8.txt",
+      "PackagePath": "staticwebassets\\day8.txt"
+    },
+    {
+      "Id": "C:\\Users\\mens\\source\\repos\\AdventOfCode\\wwwroot\\day9.txt",
+      "PackagePath": "staticwebassets\\day9.txt"
+    },
+    {
+      "Id": "C:\\Users\\mens\\source\\repos\\AdventOfCode\\wwwroot\\favicon.png",
+      "PackagePath": "staticwebassets\\favicon.png"
+    },
+    {
+      "Id": "C:\\Users\\mens\\source\\repos\\AdventOfCode\\wwwroot\\images\\horizontal.svg",
+      "PackagePath": "staticwebassets\\images\\horizontal.svg"
+    },
+    {
+      "Id": "C:\\Users\\mens\\source\\repos\\AdventOfCode\\wwwroot\\images\\northeast.svg",
+      "PackagePath": "staticwebassets\\images\\northeast.svg"
+    },
+    {
+      "Id": "C:\\Users\\mens\\source\\repos\\AdventOfCode\\wwwroot\\images\\northwest.svg",
+      "PackagePath": "staticwebassets\\images\\northwest.svg"
+    },
+    {
+      "Id": "C:\\Users\\mens\\source\\repos\\AdventOfCode\\wwwroot\\images\\southeast.svg",
+      "PackagePath": "staticwebassets\\images\\southeast.svg"
+    },
+    {
+      "Id": "C:\\Users\\mens\\source\\repos\\AdventOfCode\\wwwroot\\images\\southwest.svg",
+      "PackagePath": "staticwebassets\\images\\southwest.svg"
+    },
+    {
+      "Id": "C:\\Users\\mens\\source\\repos\\AdventOfCode\\wwwroot\\images\\start.svg",
+      "PackagePath": "staticwebassets\\images\\start.svg"
+    },
+    {
+      "Id": "C:\\Users\\mens\\source\\repos\\AdventOfCode\\wwwroot\\images\\vertical.svg",
+      "PackagePath": "staticwebassets\\images\\vertical.svg"
+    },
+    {
+      "Id": "obj\\Debug\\net9.0\\staticwebassets\\msbuild.AdventOfCode.Microsoft.AspNetCore.StaticWebAssetEndpoints.props",
+      "PackagePath": "build\\Microsoft.AspNetCore.StaticWebAssetEndpoints.props"
+    },
+    {
+      "Id": "obj\\Debug\\net9.0\\staticwebassets\\msbuild.AdventOfCode.Microsoft.AspNetCore.StaticWebAssets.props",
+      "PackagePath": "build\\Microsoft.AspNetCore.StaticWebAssets.props"
+    },
+    {
+      "Id": "obj\\Debug\\net9.0\\staticwebassets\\msbuild.build.AdventOfCode.props",
+      "PackagePath": "build\\AdventOfCode.props"
+    },
+    {
+      "Id": "obj\\Debug\\net9.0\\staticwebassets\\msbuild.buildMultiTargeting.AdventOfCode.props",
+      "PackagePath": "buildMultiTargeting\\AdventOfCode.props"
+    },
+    {
+      "Id": "obj\\Debug\\net9.0\\staticwebassets\\msbuild.buildTransitive.AdventOfCode.props",
+      "PackagePath": "buildTransitive\\AdventOfCode.props"
+    }
+  ],
+  "ElementsToRemove": []
+}

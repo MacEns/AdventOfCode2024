@@ -1,0 +1,269 @@
+﻿@page "/day8"
+@using System.Drawing
+@inject IWebHostEnvironment WebHostEnvironment
+
+<PageTitle>Day @DayNumber</PageTitle>
+
+<div class="container-fluid">
+    <div class="d-flex justify-content-between mb-2">
+        <h1>Day @DayNumber</h1>
+
+        <div class="d-flex justify-content-around gap-4 flex-grow-1">
+            <h4 class="border border-primary p-1">Part1 Result: @Part1Result</h4>
+            <h4 class="border border-primary p-1">Part2 Result: @Part2Result</h4>
+        </div>
+
+        <div class="d-flex justify-content-end gap-2">
+            <button class="btn btn-primary" @onclick="Part1">Part 1</button>
+            <button class="btn btn-primary" @onclick="Part2" >Part 2</button>
+        </div>
+    </div>
+
+
+    <div class="d-flex justify-content-start gap-2 mb-2">
+        <div class="input-group input-group-sm w-25">
+            <label class="input-group-text">Char</label>
+            <select class="form-select form-select-sm" @bind="SelectedChar">
+                @foreach (var c in NodeChars)
+                {
+                    <option value="@c">@c</option>
+                }
+            </select>
+        </div>
+    </div>
+
+    <p class="my-0">Antennas: @Antennas.Count</p>
+    <p class="my-0">AntennaGroups: @AntennaGroups.Count</p>
+    <p class="my-0">Antinodes: @Antinodes.Count</p>
+
+
+    <table class="table table-sm table-bordered table-striped">
+        <tbody>
+        @for (var rowIdx = 0; rowIdx < Characters.Count; rowIdx++)
+        {
+            <tr class="" style="font-family: Consolas; font-size: 12px">
+                @for (var colIdx = 0; colIdx < Characters[0].Count; colIdx++)
+                {
+                    var c = Antennas.FirstOrDefault(x => x.Row == rowIdx && x.Column == colIdx)?.Frequency ?? ' ';
+                    var antinodes = Antinodes.Where(x => x.Row == rowIdx && x.Column == colIdx);
+                        <td class="@(SelectedChar == c ? "table-danger" : "table-primary")">
+                        @c
+
+                        @if (antinodes.Any())
+                        {
+                            <span class="badge bg-danger">@string.Join(',', antinodes.Select(x => x.Frequency))</span>
+                        }
+                    </td>
+                }
+            </tr>
+        }
+        </tbody>
+    </table>
+
+</div>
+
+@code {
+    private const int DayNumber = 8;
+
+    private long Part1Result { get; set; } = 0;
+    private long Part2Result { get; set; } = 0;
+
+    private static int RowCount;
+    private static int ColCount;
+
+    private List<string> Input = new();
+    private List<List<char>> Characters = [];
+    private List<char> NodeChars => Characters.SelectMany(x => x).Where(x => x != '.').Distinct().Order().ToList();
+    private List<Antenna> Antennas = [];
+    private Dictionary<char, List<Antenna>> AntennaGroups = [];
+
+    private List<Antenna> Antinodes = [];
+
+    private char SelectedChar = 'A';
+
+    protected override void OnInitialized()
+    {
+        try
+        {
+            var filePath = Path.Combine(WebHostEnvironment.WebRootPath, $"day{DayNumber}.txt");
+            var file = File.ReadAllText(filePath);
+            Input =  file
+                .Split("\n")
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .ToList();
+            Characters = Input.Select(x => x.ToList()).ToList();
+
+            RowCount = Characters.Count;
+            ColCount = Characters[0].Count;
+        }
+        catch (Exception e)
+        {
+            Console.WriteLine(e);
+        }
+    }
+
+    private void Part1()
+    {
+        Antennas = Characters
+            .SelectMany((x, i) => x.Select((c, j) => new Antenna(c, i, j)))
+            .Where(x => x.Frequency != '.')
+            .ToList();
+
+        AntennaGroups = Antennas
+            .GroupBy(x => x.Frequency)
+            .ToDictionary(x => x.Key, x => x.ToList());
+
+        Antinodes = AntennaGroups
+            .SelectMany(x => GetAntinodesPart1(x.Value))
+            .Where(InGrid)
+            .DistinctBy(x => $"{x.Row},{x.Column}")
+            .ToList();
+
+        Part1Result = Antinodes.Count;
+    }
+
+    private List<Antenna> GetAntinodesPart1(List<Antenna> antennae)
+    {
+        List<Antenna> antinodes = [];
+        for (var i = 0; i < antennae.Count; i ++)
+        {
+            for (var j = i + 1; j < antennae.Count; j++)
+            {
+                antinodes.AddRange(GetAntinodesPart1(antennae[i], antennae[j]));
+            }
+        }
+
+        return antinodes;
+    }
+
+    private List<Antenna> GetAntinodesPart1(Antenna node1, Antenna node2)
+    {
+        var v1 = new LkVector2(node1.Column, node1.Row);
+        var v2 = new LkVector2(node2.Column, node2.Row);
+
+        var difference = v2 - v1;
+
+        var n1 = new Antenna(node1.Frequency, (int)(v1 - difference).Y, (int)(v1 - difference).X);
+        var n2 = new Antenna(node1.Frequency, (int)(v2 + difference).Y, (int)(v2 + difference).X);
+
+        return [n1, n2];
+    }
+
+    private void Part2()
+    {
+        // Antennas = Characters
+        //     .SelectMany((x, i) => x.Select((c, j) => new Antenna(c, i, j)))
+        //     .Where(x => x.Frequency != '.')
+        //     .ToList();
+        //
+        // AntennaGroups = Antennas
+        //     .GroupBy(x => x.Frequency)
+        //     .ToDictionary(x => x.Key, x => x.ToList());
+        //
+        // Antinodes = AntennaGroups
+        //     .SelectMany(x => GetAntinodesPart2(x.Value))
+        //     .Where(InGrid)
+        //     .DistinctBy(x => $"{x.Row},{x.Column}")
+        //     .ToList();
+
+        Part2Result = Part2(Input);
+    }
+
+    private List<Antenna> GetAntinodesPart2(List<Antenna> antennae)
+    {
+        List<Antenna> antinodes = [];
+        for (var i = 0; i < antennae.Count; i ++)
+        {
+            for (var j = i + 1; j < antennae.Count; j++)
+            {
+                antinodes.AddRange(GetAntinodesPart2(antennae[i], antennae[j]));
+            }
+        }
+
+        return antinodes;
+    }
+
+    private List<Antenna> GetAntinodesPart2(Antenna node1, Antenna node2)
+    {
+        var v1 = new LkVector2(node1.Column, node1.Row);
+        var v2 = new LkVector2(node2.Column, node2.Row);
+
+        var difference = v2 - v1;
+        var slope = difference.Y / difference.X;
+
+        var nodes1 = Enumerable.Range(0, 100)
+            .Select(x =>
+            {
+                var row = (int)(v1.Y - (difference.Y * x));
+                var col = (int)(v1.X - (difference.X * x));
+                return new Antenna(node1.Frequency, row, col);
+            })
+            .ToList();
+        var nodes2 = Enumerable.Range(0, 100)
+            .Select(x =>
+            {
+                var row = (int)(v1.Y - (difference.Y * x));
+                var col = (int)(v1.X - (difference.X * x));
+                return new Antenna(node1.Frequency, row, col);
+            })
+            .ToList();
+
+        return [node1, node2, ..nodes1, ..nodes2];
+    }
+
+    private static long Part2(IReadOnlyList<string> input)
+    {
+        var uniqueAntiNodes = new HashSet<(int row, int col)>();
+        var antennas = GetAntennas(input);
+        var antennaToRowCol = GetAntennaToRowCol(antennas);
+        foreach (var antenna in antennas)
+        {
+            var sameFrequencyAntennas = antennaToRowCol[antenna.Freq]
+                .Where(rowCol => rowCol.row != antenna.row || rowCol.col != antenna.col)
+                .ToList();
+            foreach (var rowCol in sameFrequencyAntennas)
+            {
+                var delta = (row: antenna.row - rowCol.row, col: antenna.col - rowCol.col);
+                var potentialAntiNode = (row: antenna.row + delta.row, col: antenna.col + delta.col);
+                while (InGrid(potentialAntiNode))
+                {
+                    uniqueAntiNodes.Add(potentialAntiNode);
+                    potentialAntiNode = (potentialAntiNode.row + delta.row, potentialAntiNode.col + delta.col);
+                }
+                potentialAntiNode = (row: antenna.row - delta.row, col: antenna.col - delta.col);
+                while (InGrid(potentialAntiNode))
+                {
+                    uniqueAntiNodes.Add(potentialAntiNode);
+                    potentialAntiNode = (potentialAntiNode.row - delta.row, potentialAntiNode.col - delta.col);
+                }
+            }
+        }
+        return uniqueAntiNodes.Count;
+    }
+
+    private static Dictionary<char, List<(int row, int col)>> GetAntennaToRowCol(List<(char Freq, int row, int col)> antennas)
+    {
+        var antennaToRowCol = antennas.GroupBy(t => t.Freq)
+            .ToDictionary(g => g.Key,
+                g => g.Select(t => (t.row, t.col)).ToList());
+        return antennaToRowCol;
+    }
+
+    private static List<(char Freq, int row, int col)> GetAntennas(IReadOnlyList<string> input)
+    {
+        var antennas = input.SelectMany((line, row) => line.Select((ch, col) => (Freq: ch, row, col)))
+            .Where(t => t.Freq != '.')
+            .ToList();
+        return antennas;
+    }
+
+
+    private bool InGrid(Antenna antinode)
+        => antinode.Row >= 0 && antinode.Row < Characters.Count && antinode.Column >= 0 && antinode.Column < Characters[0].Count;
+
+    private static bool InGrid((int row, int col) rowCol)
+        => rowCol.row >= 0 && rowCol.row < RowCount && rowCol.col >= 0 && rowCol.col < ColCount;
+
+    private record Antenna(char Frequency, int Row, int Column);
+
+}

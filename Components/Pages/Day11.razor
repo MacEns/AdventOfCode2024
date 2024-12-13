@@ -1,0 +1,183 @@
+﻿@page "/day11"
+@inject IWebHostEnvironment WebHostEnvironment
+
+<PageTitle>Day @DayNumber</PageTitle>
+
+<div class="container-fluid">
+    <div class="d-flex justify-content-between">
+        <h1>Day @DayNumber</h1>
+
+        <div class="d-flex justify-content-around gap-4 flex-grow-1">
+            <h4 class="border border-primary p-1">Part1 Result: @Part1Result</h4>
+            <h4 class="border border-primary p-1">Part2 Result: @Part2Result</h4>
+        </div>
+
+        <div class="d-flex justify-content-end gap-2">
+            <button class="btn btn-primary" @onclick="Part1">Part 1</button>
+            <button class="btn btn-primary" @onclick="Part2" >Part 2</button>
+            <button class="btn btn-primary" @onclick="Blink" >Blink</button>
+        </div>
+    </div>
+
+    <p>Blinks: @BlinkCount</p>
+
+    @if (Numbers.Count <= 500000)
+    {
+        <p>@string.Join(", ", Numbers)</p>
+    }
+
+</div>
+
+@code {
+    private const int DayNumber = 11;
+
+    private long Part1Result { get; set; } = 0;
+    private long Part2Result { get; set; } = 0;
+
+    private List<string> Input = new();
+    private List<long> Numbers = new();
+    private Dictionary<long, long> NumbersDict = new();
+
+    private Dictionary<long, List<long>> LookupValues = new();
+
+    private int BlinkCount = 0;
+
+    protected override void OnInitialized()
+    {
+        try
+        {
+            var filePath = Path.Combine(WebHostEnvironment.WebRootPath, $"day{DayNumber}.txt");
+            var file = File.ReadAllText(filePath);
+            Input =  file
+                .Split("\n")
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .ToList();
+            SetNumbers();
+        }
+        catch (Exception e)
+        {
+            Console.WriteLine(e);
+        }
+    }
+
+    private void SetNumbers()
+    {
+        Numbers = Input[0].Split(' ').Select(long.Parse).ToList();
+        LookupValues = new();
+    }
+
+    private async Task Part1()
+    {
+        SetNumbers();
+        BlinkCount = 0;
+
+        NumbersDict = Numbers
+            .GroupBy(x => x)
+            .ToDictionary(x => x.Key, x => (long)x.Count());
+        foreach (var _ in Enumerable.Range(0, 25))
+        {
+            NumbersDict = await Blink2(NumbersDict);
+        }
+
+        var numbers = NumbersDict.ToList().Select(x => x.Value).Sum();
+        Part1Result = numbers;
+    }
+
+    private async Task Part2()
+    {
+        SetNumbers();
+        BlinkCount = 0;
+
+        NumbersDict = Numbers
+            .GroupBy(x => x)
+            .ToDictionary(x => x.Key, x => (long)x.Count());
+        foreach (var _ in Enumerable.Range(0, 75))
+        {
+            NumbersDict = await Blink2(NumbersDict);
+        }
+
+        Part2Result = NumbersDict.ToList().Select(x => x.Value).Sum();
+    }
+
+    private async Task Blink()
+    {
+        List<long> newNumbers = new();
+        foreach (var number in Numbers)
+        {
+            newNumbers.AddRange(GetValue(number));
+        }
+
+        Numbers = newNumbers;
+        BlinkCount++;
+        await InvokeAsync(StateHasChanged);
+        await Task.Delay(1);
+    }
+
+    private async Task<Dictionary<long, long>> Blink2(Dictionary<long, long> numbersDict)
+    {
+        Dictionary<long, long> r = new();
+        foreach (var key in numbersDict.Keys)
+        {
+            var values = GetValue(key);
+            foreach (var value in values)
+            {
+                if (r.ContainsKey(value))
+                {
+                    r[value] += numbersDict[key];
+                }
+                else
+                {
+                    r[value] = numbersDict[key];
+                }
+            }
+        }
+
+        BlinkCount++;
+        await InvokeAsync(StateHasChanged);
+        await Task.Delay(1);
+
+        return r;
+    }
+
+    private List<long> GetValue(long number)
+    {
+        if (LookupValues.TryGetValue(number, out var value))
+        {
+            return value;
+        }
+
+        var str = number.ToString();
+        // If the stone is engraved with the number 0,
+        // it is replaced by a stone engraved with the number 1.
+        if (number == 0)
+        {
+            List<long> result = [1];
+            LookupValues.TryAdd(number, result);
+            return result;
+        }
+
+        // If the stone is engraved with a number that has an even number of digits,
+        // it is replaced by two stones. The left half of the digits are engraved on the new left stone,
+        // and the right half of the digits are engraved on the new right stone.
+        // (The new numbers don't keep extra leading zeroes: 1000 would become stones 10 and 0.)
+        else if (str.Length % 2 == 0)
+        {
+            var half = str.Length / 2;
+            var left = long.Parse(str[..half]);
+            var right = long.Parse(str[half..]);
+
+            List<long> result = [left, right];
+            LookupValues.TryAdd(number, result);
+            return result;
+        }
+
+        // If none of the other rules apply, the stone is replaced by a new stone;
+        // the old stone's number multiplied by 2024 is engraved on the new stone.
+        else
+        {
+            List<long> result = [number * 2024];
+            LookupValues.TryAdd(number, result);
+            return result;
+        }
+    }
+}

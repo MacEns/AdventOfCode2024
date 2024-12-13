@@ -1,0 +1,211 @@
+﻿@page "/day5"
+@inject IWebHostEnvironment WebHostEnvironment
+
+<PageTitle>Day @DayNumber</PageTitle>
+
+<div class="container-fluid">
+    <div class="d-flex justify-content-between">
+        <h1>Day @DayNumber</h1>
+
+        <div class="d-flex justify-content-around gap-4 flex-grow-1">
+            <h4 class="border border-primary p-1">Part1 Result: @Part1Result</h4>
+            <h4 class="border border-primary p-1">Part2 Result: @Part2Result</h4>
+        </div>
+
+        <div class="d-flex justify-content-end gap-2">
+            <button class="btn btn-primary" @onclick="Part1">Part 1</button>
+            <button class="btn btn-primary" @onclick="Part2" >Part 2</button>
+        </div>
+    </div>
+
+    <div class="d-flex flex-row gap-2 my-2">
+        <div class="d-flex flex-column gap-1 border p-1">
+            <table class="table">
+                <thead>
+                <tr>
+                    <th></th>
+                    <th>Before</th>
+                    <th>After</th>
+                </tr>
+                </thead>
+                <tbody>
+                    @foreach (var (idx, rule) in Rules.Index())
+                    {
+                        <tr>
+                            <td>@idx</td>
+                            <td>@rule.Before</td>
+                            <td>@rule.After</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+        <div class="d-flex flex-column gap-1 border p-1 flex-grow-1">
+            <table class="table">
+                <thead>
+                <tr>
+                    <th>Updates</th>
+                    <th>Rules</th>
+                    <th>Valid</th>
+                </tr>
+                </thead>
+                <tbody>
+                @foreach (var update in UpdateStatuses.OrderBy(x => x.Rules.Count))
+                {
+                    <tr class="@(update.IsValid ? "table-success" : "table-danger")">
+                        <td>@string.Join(", ", update.Update)</td>
+                        <td>
+                            @foreach (var rule in update.Rules)
+                            {
+                                var ruleHolds = update.Update.IndexOf(rule.Before) < update.Update.IndexOf(rule.After);
+                                var cssClass = ruleHolds ? string.Empty : "text-danger fw-bold";
+                                <span class="@cssClass">@($"{rule.Before}|{rule.After} ")</span>
+                            }
+                        </td>
+                        <td>
+                            @if (update.IsValid)
+                            {
+                                <span>Yes</span>
+                            }
+                            else
+                            {
+                                <span class="text-danger fw-bold">No</span>
+                            }
+                        </td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+@code {
+    private const int DayNumber = 5;
+
+    private long Part1Result { get; set; } = 0;
+    private long Part2Result { get; set; } = 0;
+
+    private List<string> Input = new();
+    private List<PageOrderingRule> Rules = new();
+    private List<List<int>> Updates = new();
+
+    private List<UpdateStatus> UpdateStatuses = new();
+
+    protected override void OnInitialized()
+    {
+        try
+        {
+            var filePath = Path.Combine(WebHostEnvironment.WebRootPath, $"day{DayNumber}.txt");
+            var file = File.ReadAllText(filePath);
+            Input =  file
+                .Split("\n")
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .ToList();
+
+            Rules = Input
+                .Where(x => x.Contains('|'))
+                .Select(x => x.Split('|'))
+                .Select(x => new PageOrderingRule(int.Parse(x[0]), int.Parse(x[1])))
+                .ToList();
+
+            Updates = Input
+                .Where(x => x.Contains(','))
+                .Select(x => x.Split(','))
+                .Select(x => x.Select(int.Parse).ToList())
+                .ToList();
+        }
+        catch (Exception e)
+        {
+            Console.WriteLine(e);
+        }
+    }
+
+    private void Part1()
+    {
+        UpdateStatuses = Updates.Select(update =>
+            {
+                var rules = RequiredRuleIndices(update)
+                    .Select(x => Rules[x])
+                    .ToList();
+                var isValid = rules.All(x => update.IndexOf(x.Before) < update.IndexOf(x.After));
+
+                return new UpdateStatus(update, rules, isValid);
+            })
+            .ToList();
+
+        Part1Result = UpdateStatuses
+            .Where(x => x.IsValid)
+            .Select(x => x.Update[x.Update.Count / 2])
+            .Sum();
+    }
+
+    private void Part2()
+    {
+        UpdateStatuses = Updates.Select(update =>
+        {
+            var rules = GetRequiredRules(update);
+            return new UpdateStatus(update, rules, UpdateMeetsRules(update, rules));
+        })
+        .ToList();
+
+        var invalidUpdates = UpdateStatuses.Where(x => !x.IsValid).ToList();
+        var fixedUpdates = new List<UpdateStatus>();
+
+        foreach (var invalidUpdate in invalidUpdates)
+        {
+            var fixedUpdate = invalidUpdate.Update
+                .OrderByDescending(x => invalidUpdate.Rules.Count(r => r.Before == x))
+                .ToList();
+            foreach (var rule in invalidUpdate.Rules.OrderBy(r => fixedUpdate.IndexOf(r.Before)))
+            {
+                var beforeIndex = fixedUpdate.IndexOf(rule.Before);
+                var afterIndex = fixedUpdate.IndexOf(rule.After);
+                if (beforeIndex > afterIndex)
+                {
+                    fixedUpdate[beforeIndex] = rule.After;
+                    fixedUpdate[afterIndex] = rule.Before;
+                }
+            }
+
+            var newUpdate = new UpdateStatus(
+                fixedUpdate,
+                GetRequiredRules(fixedUpdate),
+                UpdateMeetsRules(fixedUpdate, invalidUpdate.Rules));
+
+            fixedUpdates.Add(newUpdate);
+            UpdateStatuses.Remove(invalidUpdate);
+            UpdateStatuses.Add(newUpdate);
+        }
+
+        Part2Result = fixedUpdates
+            .Select(x => x.Update[x.Update.Count / 2])
+            .Sum();
+    }
+
+    private bool UpdateMeetsRules(List<int> update, List<PageOrderingRule> rules) =>
+        rules.All(x => UpdateMeetsRule(update, x));
+
+    private bool UpdateMeetsRule(List<int> update, PageOrderingRule rule) =>
+        update.IndexOf(rule.Before) < update.IndexOf(rule.After);
+
+    private List<PageOrderingRule> GetRequiredRules(List<int> update)
+    {
+        return RequiredRuleIndices(update)
+            .Select(x => Rules[x])
+            .Distinct()
+            .ToList();
+    }
+
+    private List<int> RequiredRuleIndices(List<int> update)
+    {
+        return Rules
+            .Index()
+            .Where(x => update.Contains(x.Item.Before) && update.Contains(x.Item.After))
+            .Select(x => x.Index)
+            .ToList();
+    }
+
+    private record UpdateStatus(List<int> Update, List<PageOrderingRule> Rules, bool IsValid);
+    private record PageOrderingRule(int Before, int After);
+}

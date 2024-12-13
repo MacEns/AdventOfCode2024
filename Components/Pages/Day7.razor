@@ -1,0 +1,167 @@
+﻿@page "/day7"
+@inject IWebHostEnvironment WebHostEnvironment
+
+<PageTitle>Day @DayNumber</PageTitle>
+
+<div class="container-fluid">
+    <div class="d-flex justify-content-between">
+        <h1>Day @DayNumber</h1>
+
+        <div class="d-flex justify-content-around gap-4 flex-grow-1">
+            <h4 class="border border-primary p-1">Part1 Result: @Part1Result</h4>
+            <h4 class="border border-primary p-1">Part2 Result: @Part2Result</h4>
+        </div>
+
+        <div class="d-flex justify-content-end gap-2">
+            <button class="btn btn-primary" @onclick="Part1">Part 1</button>
+            <button class="btn btn-primary" @onclick="Part2" >Part 2</button>
+        </div>
+    </div>
+
+    @if (Equations.Count == 0)
+    {
+        <p>No Equations found</p>
+    }
+    else
+    {
+        <table class="table table-sm table-bordered">
+            <thead>
+            <tr>
+                <th>Solveable</th>
+                <th>Result</th>
+                <th>Possiblities</th>
+                <th>Numbers</th>
+            </tr>
+            </thead>
+            <tbody>
+        @foreach (var equation in Equations)
+        {
+            <tr>
+                <td>@(equation.Solveable ? "Yes" : "No")</td>
+                <td>@equation.Result</td>
+                <td>@string.Join(", ", equation.PossibleResults)</td>
+                <td>@string.Join(", ", equation.Numbers)</td>
+            </tr>
+        }
+            </tbody>
+        </table>
+    }
+
+</div>
+
+@code {
+    private const int DayNumber = 7;
+
+    private long Part1Result { get; set; } = 0;
+    private long Part2Result { get; set; } = 0;
+
+    private List<string> Input = new();
+    private List<Equation> Equations = new();
+
+    protected override void OnInitialized()
+    {
+        try
+        {
+            var filePath = Path.Combine(WebHostEnvironment.WebRootPath, $"day{DayNumber}.txt");
+            var file = File.ReadAllText(filePath);
+            Input =  file
+                .Split("\n")
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .ToList();
+        }
+        catch (Exception e)
+        {
+            Console.WriteLine(e);
+        }
+    }
+
+    private void Part1()
+    {
+        Equations = Input
+            .Select(x =>
+            {
+                var split = x.Split(':');
+                var result = long.Parse(split.FirstOrDefault());
+                var numbers = split.Last().Trim().Split(' ').Select(long.Parse).ToList();
+                return new Equation(result, numbers);
+            })
+            .OrderByDescending(x => x.Solveable)
+            .ToList();
+
+        Part1Result = Equations
+            .Where(x => x.Solveable)
+            .Sum(x => x.Result);
+    }
+
+    private void Part2()
+    {
+        Equations = Input
+            .Select(x =>
+            {
+                var split = x.Split(':');
+                var result = long.Parse(split.FirstOrDefault());
+                var numbers = split.Last().Trim().Split(' ').Select(long.Parse).ToList();
+                return new Equation(result, numbers, false);
+            })
+            .OrderByDescending(x => x.Solveable)
+            .ToList();
+
+        Part2Result = Equations
+            .Where(x => x.Solveable)
+            .Sum(x => x.Result);
+    }
+
+    private class Equation
+    {
+        public long Result { get; set; }
+        public List<long> Numbers { get; set; } = new();
+        public bool Solveable { get; set; } = false;
+        public List<long> PossibleResults { get; set; } = new();
+
+        public Equation(long result, List<long> numbers, bool part1 = true)
+        {
+            Result = result;
+            Numbers = numbers;
+            Solveable = part1 ? PossibleResults1(numbers).Contains(result) : PossibleResults2(numbers).Contains(result);
+            PossibleResults = part1 ? PossibleResults1(numbers).Order().ToList() : PossibleResults2(numbers).Order().ToList();
+        }
+    }
+
+    private static List<long> PossibleResults1(List<long> numbers)
+    {
+        if (numbers.Count == 1)
+        {
+            return [numbers[0]];
+        }
+
+        if (numbers.Count == 2)
+        {
+            return [numbers[0] + numbers[1], numbers[0] * numbers[1]];
+        }
+
+        var last = numbers.LastOrDefault();
+        var subList = numbers.Take(numbers.Count - 1).ToList();
+        return PossibleResults1(subList)
+            .SelectMany(x => new List<long> { x + last, x * last })
+            .ToList();
+    }
+
+    private static List<long> PossibleResults2(List<long> numbers)
+    {
+        if (numbers.Count == 1)
+        {
+            return [numbers[0]];
+        }
+
+        if (numbers.Count == 2)
+        {
+            return [numbers[0] + numbers[1], numbers[0] * numbers[1], long.Parse($"{numbers[0]}{numbers[1]}")];
+        }
+
+        var last = numbers.LastOrDefault();
+        var subList = numbers.Take(numbers.Count - 1).ToList();
+        return PossibleResults2(subList)
+            .SelectMany(x => new List<long> { x + last, x * last, long.Parse($"{x}{last}") })
+            .ToList();
+    }
+}

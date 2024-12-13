@@ -1,0 +1,76 @@
+﻿@page "/day1"
+@inject IWebHostEnvironment WebHostEnvironment
+
+<PageTitle>Day @DayNumber</PageTitle>
+
+<div class="container-fluid">
+    <div class="d-flex justify-content-between">
+        <h1>Day @DayNumber</h1>
+
+        <div class="d-flex justify-content-around gap-4 flex-grow-1">
+            <h4 class="border border-primary p-1">Part1 Result: @Part1Result</h4>
+            <h4 class="border border-primary p-1">Part2 Result: @Part2Result</h4>
+        </div>
+
+        <div class="d-flex justify-content-end gap-2">
+            <button class="btn btn-primary" @onclick="Part1">Part 1</button>
+            <button class="btn btn-primary" @onclick="Part2" >Part 2</button>
+        </div>
+    </div>
+
+</div>
+
+@code {
+    private const int DayNumber = 1;
+
+    private long Part1Result { get; set; } = 0;
+    private long Part2Result { get; set; } = 0;
+
+    private List<string> Input = new();
+
+    protected override void OnInitialized()
+    {
+        try
+        {
+            var filePath = Path.Combine(WebHostEnvironment.WebRootPath, $"day{DayNumber}.txt");
+            var file = File.ReadAllText(filePath);
+            Input =  file
+                .Split("\n")
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .ToList();
+        }
+        catch (Exception e)
+        {
+            Console.WriteLine(e);
+        }
+    }
+
+    private void Part1()
+    {
+        var lists = Input
+            .Select(x => x.Split(' ').Select(i => int.TryParse(i.Trim(), out var i1) ? i1 : 0))
+            .ToList();
+        var list1 = lists.Select(x => x.First()).Order().ToList();
+        var list2 = lists.Select(x => x.Last()).Order().ToList();
+
+        for (var i = 0; i < list1.Count; i++)
+        {
+            var a = list1[i];
+            var b = list2[i];
+            Part1Result += Math.Abs(a - b);
+        }
+    }
+
+    private void Part2()
+    {
+        var lists = Input
+            .Select(x => x.Split(' ').Select(i => int.TryParse(i.Trim(), out var i1) ? i1 : 0))
+            .ToList();
+
+        var list1 = lists.Select(x => x.First()).Distinct().ToList();
+        var list2 = lists.Select(x => x.Last()).Order().ToList();
+
+        var counts = list1.Select(x => new KeyValuePair<int,int>(x, list2.Count(y => y == x))).ToList();
+        Part2Result = counts.Select(x => x.Key * x.Value).Sum();
+    }
+}

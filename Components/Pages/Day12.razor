@@ -1,0 +1,325 @@
+﻿@page "/day12"
+@inject IWebHostEnvironment WebHostEnvironment
+
+<PageTitle>Day @DayNumber</PageTitle>
+
+<div class="container-fluid">
+    <div class="d-flex justify-content-start mb-4 gap-4">
+        <h1>Day @DayNumber</h1>
+
+        <div class="d-flex justify-content-start gap-4">
+            <h4 class="border border-primary p-1">Part1 Result: @Part1Result</h4>
+            <h4 class="border border-primary p-1">Part2 Result: @Part2Result</h4>
+        </div>
+
+        <div class="d-flex justify-content-start gap-2">
+            <button class="btn btn-primary" @onclick="Part1">Part 1</button>
+            <button class="btn btn-primary" @onclick="Part2" >Part 2</button>
+        </div>
+    </div>
+
+    @if (Plots.Count > 0)
+    {
+        <div class="d-flex gap-2">
+            <span class="border mx-2">Plots: @Rows.Count x @Rows[0].Count</span>
+            <span class="border mx-2">@Letters.Count Letters: @string.Join(", ", Letters)</span>
+            <span class="border mx-2">Regions: @Regions.Count</span>
+        </div>
+    }
+
+    <table class="table table-sm table-bordered">
+        <tbody>
+        <tr>
+            @foreach (var color in Colors)
+            {
+                <td style="background-color: @color">@color</td>
+            }
+        </tr>
+        </tbody>
+    </table>
+
+    <div style="width: 1200px">
+        <table class="table table-sm table-bordered">
+            <thead>
+            <tr style="font-family: Consolas; font-size:  10px">
+                <td></td>
+                @foreach (var row in Rows[0].Index())
+                {
+                    <th>@row.Index</th>
+                }
+            </tr>
+            </thead>
+            <tbody>
+            @foreach (var row in Rows)
+            {
+                <tr style="font-family: Consolas; font-size:  10px">
+                    <th>@row[0].Y</th>
+
+                    @foreach (var p in row.ToList())
+                    {
+                        <td style="background-color: @GetColor(p.Letter)">@p.Letter</td>
+                    }
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+@code {
+    private const int DayNumber = 12;
+
+    private long Part1Result { get; set; } = 0;
+    private long Part2Result { get; set; } = 0;
+
+    private List<string> Input = new();
+    private List<Plot> Plots = new();
+    private List<List<Plot>> Rows => Plots.GroupBy(x => x.Y).Select(x => x.ToList()).ToList();
+    private List<char> Letters => Plots.Select(x => x.Letter).Distinct().Order().ToList();
+    private List<Region> Regions = new();
+
+    private string GetColor(char letter) => Colors[Letters.IndexOf(letter) % Colors.Count];
+    private static readonly List<string> Colors = new()
+    {
+        "#2f4f4f",
+        "#8b4513",
+        "#808000",
+        "#008000",
+        "#000080",
+        "#9acd32",
+        "#7f007f",
+        "#8fbc8f",
+        "#ff0000",
+        "#ff8c00",
+        "#ffd700",
+        "#0000cd",
+        "#00ff00",
+        "#00fa9a",
+        "#dc143c",
+        "#00ffff",
+        "#ff00ff",
+        "#db7093",
+        "#f0e68c",
+        "#6495ed",
+        "#87ceeb",
+        "#ff1493",
+        "#7b68ee",
+        "#ffa07a",
+        "#ee82ee",
+        "#fdf5e6",
+    };
+
+
+    protected override void OnInitialized()
+    {
+        try
+        {
+            var filePath = Path.Combine(WebHostEnvironment.WebRootPath, $"day{DayNumber}.txt");
+            var file = File.ReadAllText(filePath);
+            Input =  file
+                .Split("\n")
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .ToList();
+            Plots = Input
+                .SelectMany((row, y) => row.Select((c, x) => new Plot(c, x, y)))
+                .ToList();
+        }
+        catch (Exception e)
+        {
+            Console.WriteLine(e);
+        }
+    }
+
+    private void Part1()
+    {
+        Console.WriteLine("Part 1");
+        Plots = Input
+            .SelectMany((row, y) => row.Select((c, x) => new Plot(c, x, y)))
+            .ToList();
+
+        var plots = Plots.ToList();
+        Regions = [];
+        while (plots.Count > 0)
+        {
+            var plot = plots.First();
+            var region = GetRegion(plot, plots);
+            Regions.Add(new Region(plot.Letter, GetColor(plot.Letter), region));
+            plots = plots.Except(region).ToList();
+        }
+
+        Part1Result = Regions.Sum(x => x.Part1Price);
+        Console.WriteLine("Part 1 Done");
+    }
+
+    private void Part2()
+    {
+        Console.WriteLine("Part 2");
+        Plots = Input
+            .SelectMany((row, y) => row.Select((c, x) => new Plot(c, x, y)))
+            .ToList();
+
+        var plots = Plots.ToList();
+        Regions = [];
+        while (plots.Count > 0)
+        {
+            var plot = plots.First();
+            var region = GetRegion(plot, plots);
+            Regions.Add(new Region(plot.Letter, GetColor(plot.Letter), region));
+            plots = plots.Except(region).ToList();
+        }
+
+        Part2Result = Regions.Sum(x => x.Part2Price);
+
+        Console.WriteLine("Part 2 Done");
+    }
+
+    private static bool IsTouching(Plot p1, Plot p2) => Math.Abs(p1.X - p2.X) + Math.Abs(p1.Y - p2.Y) == 1;
+    private static bool IsTouchingMatch(Plot p1, Plot p2) => p1.Letter == p2.Letter && IsTouching(p1, p2);
+
+    private static int GetEdgeCount(List<Plot> plots)
+    {
+        var edgePlots = plots.Where(x => IsEdgePlot(x, plots)).ToList();
+        var singleEdges = edgePlots.SelectMany(x => GetEdges(x, plots)).ToList();
+        var horizontalEdges = singleEdges.Where(x => x.Horizontal).OrderBy(x => x.Start.X).ToList();
+        var verticalEdges = singleEdges.Where(x => !x.Horizontal).OrderBy(x => x.Start.Y).ToList();
+
+        var i = 0;
+        while (i < horizontalEdges.Count)
+        {
+            var edge = horizontalEdges[i];
+            var next = horizontalEdges.FirstOrDefault(x => x.Start.X == edge.End.X && x.Start.Y == edge.End.Y);
+
+            if (next == null)
+            {
+                i++;
+                continue;
+            }
+
+            edge.End = next.End;
+            horizontalEdges.Remove(next);
+        }
+
+        var j = 0;
+        while (j < verticalEdges.Count)
+        {
+            var edge = verticalEdges[j];
+            var next = verticalEdges.FirstOrDefault(x => x.Start.X == edge.End.X && x.Start.Y == edge.End.Y);
+
+            if (next == null)
+            {
+                j++;
+                continue;
+            }
+
+            edge.End = next.End;
+            verticalEdges.Remove(next);
+        }
+
+        return horizontalEdges.Count + verticalEdges.Count;
+    }
+
+    private static List<Edge> GetEdges(Plot p, List<Plot> plots)
+    {
+        var result = new List<Edge>();
+        if (plots.Count(x => IsTouchingMatch(p, x)) == 4)
+        {
+            return result;
+        }
+
+        var up = plots.FirstOrDefault(x => x.X == p.X && x.Y == p.Y - 1);
+        var right = plots.FirstOrDefault(x => x.X == p.X + 1 && x.Y == p.Y);
+        var down = plots.FirstOrDefault(x => x.X == p.X && x.Y == p.Y + 1);
+        var left = plots.FirstOrDefault(x => x.X == p.X - 1 && x.Y == p.Y);
+
+        if (up == null)
+        {
+            result.Add(new Edge { Start = new LkVector2(p.X, p.Y), End = new LkVector2(p.X + 1, p.Y) });
+        }
+
+        if (right == null)
+        {
+            result.Add(new Edge { Start = new LkVector2(p.X + 1, p.Y), End = new LkVector2(p.X + 1, p.Y + 1) });
+        }
+
+        if (down == null)
+        {
+            result.Add(new Edge { Start = new LkVector2(p.X + 1, p.Y + 1), End = new LkVector2(p.X, p.Y + 1) });
+        }
+
+        if (left == null)
+        {
+            result.Add(new Edge { Start = new LkVector2(p.X, p.Y + 1), End = new LkVector2(p.X, p.Y) });
+        }
+
+        return result;
+    }
+
+    private static bool IsEdgePlot(Plot p, List<Plot> plots) =>  plots.Count(x => IsTouchingMatch(p, x)) < 4;
+
+    private static List<Plot> GetRegion(Plot plot, List<Plot> plots)
+    {
+        var region = new List<Plot> { plot };
+        var queue = new Queue<Plot>();
+        queue.Enqueue(plot);
+
+        while (queue.Count > 0)
+        {
+            var current = queue.Dequeue();
+            var neighbors = plots.Where(x => IsTouchingMatch(x, current) && !region.Contains(x)).ToList();
+            foreach (var neighbor in neighbors)
+            {
+                region.Add(neighbor);
+                queue.Enqueue(neighbor);
+            }
+        }
+
+        return region;
+    }
+
+    private class Region
+    {
+        public Region(char letter, string color, List<Plot> plots)
+        {
+            Letter = letter;
+            Color = color;
+            Plots = plots;
+            Perimeter = GetPerimeter(plots);
+            NumberOfSides = GetEdgeCount(plots);
+        }
+
+        public char Letter { get; set; }
+        public string Color { get; set; }
+        public List<Plot> Plots { get; set; } = [];
+        public int Area => Plots.Count;
+        public int Perimeter { get; set; }
+        public int NumberOfSides { get; set; }
+
+        public int Part1Price => Area * Perimeter;
+        public int Part2Price => Area * NumberOfSides;
+
+        public int GetPerimeter(List<Plot> plots) => plots.Count <= 1
+            ? plots.Count * 4
+            : plots.Select(x => 4 - plots.Count(y => IsTouchingMatch(x, y))).Sum();
+    }
+
+    private class Plot
+    {
+        public Plot(char letter, int x, int y)
+        {
+            Letter = letter;
+            X = x;
+            Y = y;
+        }
+
+        public char Letter { get; set; }
+        public int X { get; set; }
+        public int Y { get; set; }
+    }
+
+    private class Edge
+    {
+        public LkVector2 Start { get; set; } = new();
+        public LkVector2 End { get; set; } = new();
+        public bool Horizontal => End.Y == Start.Y;
+    }
+}
