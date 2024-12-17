@@ -7,6 +7,12 @@
     <div class="d-flex justify-content-between">
         <h1>Day @DayNumber</h1>
 
+        <p class="my-0 mx-3">Directions Remaining: @DirectionsRemaining</p>
+
+        <p class="my-0 mx-3">Next Direction: @(Directions.Count > 0 ? Enum.GetName(Directions.Peek()) : "None")</p>
+        <p class="my-0 mx-3">Running: @(IsRunning)</p>
+        <p class="my-0 mx-3">CurrentPosition: @(RobotPosition)</p>
+
         <div class="d-flex justify-content-around gap-4 flex-grow-1">
             <h4 class="border border-primary p-1">Part1 Result: @Part1Result</h4>
             <h4 class="border border-primary p-1">Part2 Result: @Part2Result</h4>
@@ -14,8 +20,46 @@
 
         <div class="d-flex justify-content-end gap-2">
             <button class="btn btn-primary" @onclick="Part1">Part 1</button>
+            <button class="btn btn-primary" @onclick="LoadMap2" >Load 2</button>
             <button class="btn btn-primary" @onclick="Part2" >Part 2</button>
+            <button class="btn btn-danger" @onclick="Stop" >Stop</button>
         </div>
+    </div>
+
+    <div class="d-flex justify-content-between gap-4">
+        <table class="table table-sm table-bordered" style="font-size: 9px; font-family: Consolas">
+            <tbody>
+                @foreach (var (y, row) in Map.Index())
+                {
+                    <tr>
+                        @foreach (var (x, c) in row.Index())
+                        {
+                            var cellClass = c == WallChar
+                                ? "table-dark"
+                                : c == RobotChar
+                                    ? "table-danger"
+                                    : c == BoxChar || c == BoxLeftChar || c == BoxRightChar
+                                        ? "table-success"
+                                        : RobotPosition.Y == y || RobotPosition.X == x
+                                            ? "table-primary"
+                                            : string.Empty;
+
+                            <td class="text-center @cellClass">
+                                @(Directions.Count > 0 && c == '@' ? DirectionToChar(Directions.Peek()) : c)
+                            </td>
+                        }
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+
+
+    <div>
+        @foreach (var direction in Directions)
+        {
+            <span>@($"{DirectionToChar(direction)}")</span>
+        }
     </div>
 
 </div>
@@ -28,6 +72,23 @@
 
     private List<string> Input = new();
 
+    private List<List<char>> Map = new();
+    private Queue<Direction> Directions = new();
+
+    private LkVector2 RobotPosition = new LkVector2(0, 0);
+    private int DirectionsRemaining = 0;
+
+    private int NumberOfBoxes => Map.SelectMany(x => x.Where(c => c == BoxChar)).Count();
+
+    private bool IsRunning = false;
+
+    private static readonly char RobotChar = '@';
+    private static readonly char WallChar = '#';
+    private static readonly char BoxChar = 'O';
+    private static readonly char BoxLeftChar = '[';
+    private static readonly char BoxRightChar = ']';
+    private static readonly char OpenChar = '.';
+
     protected override void OnInitialized()
     {
         try
@@ -38,6 +99,7 @@
                 .Split("\n")
                 .Where(x => !string.IsNullOrWhiteSpace(x))
                 .ToList();
+            LoadMap1();
         }
         catch (Exception e)
         {
@@ -45,11 +107,383 @@
         }
     }
 
-    private void Part1()
+    private async Task Part1()
     {
+        Part1Result = 0;
+        LoadMap1();
+
+        await RunMap1();
+
+        foreach (var row in Map.Index())
+        {
+            foreach (var col in row.Item.Index())
+            {
+                if (Map[row.Index][col.Index] == BoxChar)
+                {
+                    Part1Result += GetGpsCoordinate(col.Index, row.Index);
+                }
+            }
+        }
     }
 
-    private void Part2()
+    private async Task Part2()
     {
+        Part2Result = 0;
+        LoadMap2();
+
+        await RunMap2();
+    }
+
+    private void Stop()
+    {
+        IsRunning = false;
+    }
+
+    private async Task RunMap1()
+    {
+        IsRunning = true;
+
+        while (IsRunning && Directions.Any() && PositionIsValid(RobotPosition))
+        {
+            var direction = Directions.Dequeue();
+            MoveRobot1(RobotPosition, direction);
+            DirectionsRemaining--;
+
+            // await InvokeAsync(StateHasChanged);
+            // await Task.Delay(500);
+
+            if (DirectionsRemaining % 500 == 0)
+            {
+                await InvokeAsync(StateHasChanged);
+                await Task.Delay(1);
+            }
+        }
+
+        IsRunning = false;
+    }
+
+    private async Task RunMap2()
+    {
+        IsRunning = true;
+
+        while (IsRunning && Directions.Any() && PositionIsValid(RobotPosition))
+        {
+            var direction = Directions.Dequeue();
+            MoveRobot2(RobotPosition, direction);
+            DirectionsRemaining--;
+
+            await InvokeAsync(StateHasChanged);
+            await Task.Delay(500);
+
+            if (DirectionsRemaining % 500 == 0)
+            {
+                await InvokeAsync(StateHasChanged);
+                await Task.Delay(1);
+            }
+        }
+
+        IsRunning = false;
+    }
+
+    private void MoveRobot2(LkVector2 currentPosition, Direction direction)
+    {
+        var startX = currentPosition.X;
+        var startY = currentPosition.Y;
+
+        var nextPosition = GetNextPosition(currentPosition, direction);
+        if (!PositionIsValid(nextPosition))
+        {
+            Console.WriteLine($"Position {nextPosition} is invalid");
+            return;
+        }
+
+        var nextSpaceChar = Map[(int)nextPosition.Y][(int)nextPosition.X];
+
+        if (nextSpaceChar == WallChar)
+        {
+            return;
+        }
+
+        if (nextSpaceChar == OpenChar)
+        {
+            SwapPositions(currentPosition, nextPosition);
+            RobotPosition = nextPosition;
+            return;
+        }
+
+        if (nextSpaceChar == BoxLeftChar || nextSpaceChar == BoxRightChar)
+        {
+            if (!BoxCanMove2(nextPosition, direction))
+            {
+                return;
+            }
+
+            MoveBox2(nextPosition, direction);
+            SwapPositions(currentPosition, nextPosition);
+            RobotPosition = nextPosition;
+        }
+
+        if (Math.Abs(RobotPosition.X - startX) + Math.Abs(RobotPosition.Y - startY) > 1)
+        {
+            Console.WriteLine($"Robot moved more than one square from {currentPosition} => {RobotPosition}");
+            IsRunning = false;
+        }
+    }
+
+    private void MoveBox2(LkVector2 boxPosition, Direction direction)
+    {
+        var nextPosition = GetNextPosition(boxPosition, direction);
+        var nextX = (int)nextPosition.X;
+        var nextY = (int)nextPosition.Y;
+        var nextSpaceChar = Map[nextY][nextX];
+
+        if (nextSpaceChar == WallChar)
+        {
+            return;
+        }
+
+        if (nextSpaceChar == OpenChar)
+        {
+            SwapPositions(boxPosition, nextPosition);
+            return;
+        }
+
+        if (nextSpaceChar == BoxChar)
+        {
+            MoveBox2(nextPosition, direction);
+            SwapPositions(boxPosition, nextPosition);
+        }
+    }
+
+    private bool BoxCanMove2(LkVector2 boxPosition, Direction direction)
+    {
+        if (direction is Direction.Left or Direction.Right)
+        {
+            var nextPosition = GetNextPosition(boxPosition, direction);
+            var nextX = (int)nextPosition.X;
+            var nextY = (int)nextPosition.Y;
+            var nextSpaceChar = Map[nextY][nextX];
+
+            if (nextSpaceChar == BoxLeftChar || nextSpaceChar == BoxRightChar)
+            {
+                return BoxCanMove2(nextPosition, direction);
+            }
+
+            return nextSpaceChar == OpenChar;
+        }
+
+        var isLeftSide = Map[(int)boxPosition.Y][(int)boxPosition.X] == BoxLeftChar;
+        var leftSide = isLeftSide ? boxPosition : GetNextPosition(boxPosition, Direction.Left);
+        var rightSide = isLeftSide ? GetNextPosition(boxPosition, Direction.Right) : boxPosition;
+
+        var nextLeft = GetNextPosition(leftSide, direction);
+        var nextLeftChar = Map[(int)nextLeft.Y][(int)nextLeft.X];
+        var canMoveLeft = Map[(int)nextLeft.Y][(int)nextLeft.X] == OpenChar;
+        if (nextLeftChar == BoxLeftChar || nextLeftChar == BoxRightChar)
+        {
+            canMoveLeft = BoxCanMove2(nextLeft, direction);
+        }
+
+        var nextRight = GetNextPosition(rightSide, direction);
+        var nextRightChar = Map[(int)nextRight.Y][(int)nextRight.X];
+        var canMoveRight = Map[(int)nextRight.Y][(int)nextRight.X] == OpenChar;
+        if (nextRightChar == BoxLeftChar || nextRightChar == BoxRightChar)
+        {
+            canMoveRight = BoxCanMove2(nextRight, direction);
+        }
+
+        return canMoveLeft && canMoveRight;
+    }
+
+    private bool PositionIsValid(LkVector2 position) => position.X >= 0 && position.X < Map[0].Count && position.Y >= 0 && position.Y < Map.Count;
+
+    private void MoveBox1(LkVector2 boxPosition, Direction direction)
+    {
+        var nextPosition = GetNextPosition(boxPosition, direction);
+        var nextX = (int)nextPosition.X;
+        var nextY = (int)nextPosition.Y;
+        var nextSpaceChar = Map[nextY][nextX];
+
+        if (nextSpaceChar == WallChar)
+        {
+            return;
+        }
+
+        if (nextSpaceChar == OpenChar)
+        {
+            SwapPositions(boxPosition, nextPosition);
+            return;
+        }
+
+        if (nextSpaceChar == BoxChar)
+        {
+            MoveBox1(nextPosition, direction);
+            SwapPositions(boxPosition, nextPosition);
+        }
+    }
+
+    private bool BoxCanMove1(LkVector2 boxPosition, Direction direction)
+    {
+        var nextPosition = GetNextPosition(boxPosition, direction);
+        var nextX = (int)nextPosition.X;
+        var nextY = (int)nextPosition.Y;
+        var nextSpaceChar = Map[nextY][nextX];
+
+        if (nextSpaceChar == BoxChar)
+        {
+            return BoxCanMove1(nextPosition, direction);
+        }
+
+        return nextSpaceChar == OpenChar;
+    }
+
+    private void MoveRobot1(LkVector2 currentPosition, Direction direction)
+    {
+        var startX = currentPosition.X;
+        var startY = currentPosition.Y;
+
+        var nextPosition = GetNextPosition(currentPosition, direction);
+        if (!PositionIsValid(nextPosition))
+        {
+            Console.WriteLine($"Position {nextPosition} is invalid");
+            return;
+        }
+
+        var nextSpaceChar = Map[(int)nextPosition.Y][(int)nextPosition.X];
+
+        if (nextSpaceChar == WallChar)
+        {
+            // Console.WriteLine($"Found wall at next position {nextPosition}");
+            return;
+        }
+
+        if (nextSpaceChar == OpenChar)
+        {
+            SwapPositions(currentPosition, nextPosition);
+            RobotPosition = nextPosition;
+            return;
+        }
+
+        if (nextSpaceChar == BoxChar)
+        {
+            if (!BoxCanMove1(nextPosition, direction))
+            {
+                // Console.WriteLine($"Box at {nextPosition} cannot move in direction {Enum.GetName(direction)}");
+                return;
+            }
+
+            MoveBox1(nextPosition, direction);
+            SwapPositions(currentPosition, nextPosition);
+            RobotPosition = nextPosition;
+        }
+
+        if (Math.Abs(RobotPosition.X - startX) + Math.Abs(RobotPosition.Y - startY) > 1)
+        {
+            Console.WriteLine($"Robot moved more than one square from {currentPosition} => {RobotPosition}");
+            IsRunning = false;
+        }
+    }
+
+    private void SwapPositions(LkVector2 position1, LkVector2 position2)
+    {
+        var char1 = Map[(int)position1.Y][(int)position1.X];
+        var char2 = Map[(int)position2.Y][(int)position2.X];
+
+        (Map[(int)position1.Y][(int)position1.X], Map[(int)position2.Y][(int)position2.X]) = (Map[(int)position2.Y][(int)position2.X], Map[(int)position1.Y][(int)position1.X]);
+
+        if ((char1 == RobotChar && char2 != OpenChar) || (char2 == RobotChar && char1 != OpenChar))
+        {
+            Console.WriteLine($"Robot swapped with occupied space {char1} => {char2}");
+            IsRunning = false;
+        }
+
+        if ((char1 == BoxChar && char2 != OpenChar) || (char2 == BoxChar && char1 != OpenChar))
+        {
+            Console.WriteLine($"Box swapped with occupied space {char1} => {char2}");
+            IsRunning = false;
+        }
+    }
+
+    private void LoadMap1()
+    {
+        Map = Input
+            .Where(x => x.StartsWith(WallChar))
+            .Select(x => x.ToList())
+            .ToList();
+
+        var directions = Input
+            .SelectMany(x => x.ToList())
+            .Where(x => x is '<' or '>' or '^' or 'v')
+            .Select(CharToDirection)
+            .ToList();
+
+        foreach (var direction in directions)
+        {
+            Directions.Enqueue(direction);
+            DirectionsRemaining++;
+        }
+
+        var robotRow = Map.Index().FirstOrDefault(x => x.Item.Any(c => c == RobotChar)).Index;
+        RobotPosition = new LkVector2(robotRow, Map[robotRow].IndexOf(RobotChar));
+    }
+
+    private void LoadMap2()
+    {
+        Map = Input
+            .Where(x => x.StartsWith(WallChar))
+            .Select(x => x.Replace("#", "##").Replace("O", "[]").Replace(".", "..").Replace("@", "@."))
+            .Select(x => x.ToList())
+            .ToList();
+
+        var directions = Input
+            .SelectMany(x => x.ToList())
+            .Where(x => x is '<' or '>' or '^' or 'v')
+            .Select(CharToDirection)
+            .ToList();
+
+        foreach (var direction in directions)
+        {
+            Directions.Enqueue(direction);
+            DirectionsRemaining++;
+        }
+
+        var robotRow = Map.Index().FirstOrDefault(x => x.Item.Any(c => c == RobotChar)).Index;
+        RobotPosition = new LkVector2(robotRow, Map[robotRow].IndexOf(RobotChar));
+    }
+
+    private int GetGpsCoordinate(int x, int y) => 100 * y + x;
+
+    private Direction CharToDirection(char c) => c switch
+    {
+        '^' => Direction.Up,
+        '>' => Direction.Right,
+        'v' => Direction.Down,
+        _ => Direction.Left,
+    };
+
+    private char DirectionToChar(Direction d) => d switch
+    {
+        Direction.Up => '^',
+        Direction.Right => '>',
+        Direction.Down => 'v',
+        Direction.Left => '<',
+        _ => '.',
+    };
+
+    private LkVector2 GetNextPosition(LkVector2 position, Direction direction) => direction switch
+        {
+            Direction.Up => new(position.X, position.Y - 1),
+            Direction.Right => new(position.X + 1, position.Y),
+            Direction.Down => new(position.X, position.Y + 1),
+            Direction.Left => new(position.X - 1, position.Y),
+            _ => new(position.X, position.Y),
+        };
+
+    private enum Direction
+    {
+        Up,
+        Right,
+        Down,
+        Left,
     }
 }

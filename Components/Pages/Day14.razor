@@ -4,10 +4,10 @@
 <PageTitle>Day @DayNumber</PageTitle>
 
 <div class="container-fluid">
-    <div class="d-flex justify-content-between">
+    <div class="d-flex justify-content-start gap-4 mb-2">
         <h1>Day @DayNumber</h1>
 
-        <div class="d-flex justify-content-around gap-4 flex-grow-1">
+        <div class="d-flex justify-content-around gap-4">
             <h4 class="border border-primary p-1">Part1 Result: @Part1Result</h4>
             <h4 class="border border-primary p-1">Part2 Result: @Part2Result</h4>
         </div>
@@ -15,9 +15,57 @@
         <div class="d-flex justify-content-end gap-2">
             <button class="btn btn-primary" @onclick="Part1">Part 1</button>
             <button class="btn btn-primary" @onclick="Part2" >Part 2</button>
+            <button class="btn btn-primary" @onclick="LoadRobots" >LoadRobots</button>
+            <button class="btn btn-primary" @onclick="Increment" >Increment</button>
         </div>
     </div>
 
+
+    <div class="d-flex justify-content-start gap-4">
+        <div class="form-check">
+            <input class="form-check-input" type="checkbox" @bind="ViewPositions" />
+            <label class="form-check-label">View Positions</label>
+        </div>
+
+        <span>Iterations:  @(Iterations)</span>
+
+
+    </div>
+
+    @if (ViewPositions)
+    {
+        <table class="table table-sm table-striped table-bordered w-50">
+            <thead>
+            <tr>
+                <th></th>
+                @for (var x = 0; x < MaxWidth; x++)
+                {
+                    <th class="text-center" style="font-size: 8px;">@x</th>
+                }
+            </tr>
+            </thead>
+
+            <tbody>
+            @for (var y = 0; y < MaxHeight; y++)
+            {
+                var rowClass = y == MaxHeight / 2 ? "table-primary" : "";
+                <tr class="@rowClass">
+                    <th style="font-size: 8px;">@y</th>
+                    @for (var x = 0; x < MaxWidth; x++)
+                    {
+                        var colClass = RobotPositions.ContainsKey((x, y))
+                        ? "table-success"
+                        : x == MaxWidth / 2 ? "table-primary" : "";
+
+                        <td class="@colClass text-center" style="font-size: 8px;">
+                            <span>@(RobotPositions.ContainsKey((x, y)) ? RobotPositions[(x, y)].Count : ".")</span>
+                        </td>
+                    }
+                </tr>
+            }
+            </tbody>
+        </table>
+    }
 </div>
 
 @code {
@@ -27,6 +75,14 @@
     private long Part2Result { get; set; } = 0;
 
     private List<string> Input = new();
+
+    private List<Robot> Robots = new();
+    private Dictionary<(decimal X, decimal Y), List<Robot>> RobotPositions = new();
+    private static readonly int MaxWidth = 101;
+    private static readonly int MaxHeight = 103;
+
+    private long Iterations = 0;
+    private bool ViewPositions = true;
 
     protected override void OnInitialized()
     {
@@ -38,6 +94,8 @@
                 .Split("\n")
                 .Where(x => !string.IsNullOrWhiteSpace(x))
                 .ToList();
+
+            LoadRobots();
         }
         catch (Exception e)
         {
@@ -47,9 +105,165 @@
 
     private void Part1()
     {
+        LoadRobots();
+        Robots = FindNewPositions(Robots, 100);
+        RobotPositions = Robots.GroupBy(x => (x.Position.X, x.Position.Y)).ToDictionary(x => x.Key, x => x.ToList());
+        Part1Result = GetSafetyFactor(Robots);
     }
 
     private void Part2()
     {
+        LoadRobots();
+    }
+
+    private async Task Increment()
+    {
+        Iterations = 0;
+        var frames = new Dictionary<long, List<Robot>>();
+
+        var midX = MaxWidth / 2;
+
+        LoadRobots();
+        frames.Add(Iterations, Robots);
+
+        while (Iterations <= MaxHeight * MaxWidth)
+        {
+            Iterations++;
+            Robots = FindNewPositions(Robots);
+            frames.Add(Iterations, Robots);
+        }
+
+        var frameScores = frames.Values
+            .Select(frame =>
+            {
+                var rows = frame.GroupBy(y => y.Position.Y);
+                return (rows
+                    .Select(row =>
+                    {
+                        var result = 0;
+                        for (var i = 0; i < midX; i++)
+                        {
+                            if (row.Any(x => x.Position.X == midX - i) && row.Any(x => x.Position.X == midX + i))
+                            {
+                                result++;
+                            }
+                        }
+
+                        return result;
+                    })
+                .Sum(), frame);
+            })
+            .OrderByDescending(x => x.Item1)
+            .ToList();
+
+        var bestFrames = frameScores.Take(5).Select(x => x.frame).ToList();
+
+        foreach (var frame in bestFrames)
+        {
+            Robots = frame;
+            RobotPositions = Robots.GroupBy(x => (x.Position.X, x.Position.Y)).ToDictionary(x => x.Key, x => x.ToList());
+            Iterations = frames.FirstOrDefault(x => x.Value == frame).Key;
+            await InvokeAsync(StateHasChanged);
+            await Task.Delay(5000);
+        }
+
+        Console.WriteLine($"Completed {Iterations} iterations");
+        RobotPositions = Robots.GroupBy(x => (x.Position.X, x.Position.Y)).ToDictionary(x => x.Key, x => x.ToList());
+    }
+
+    private bool HasStraightLine(List<Robot> row)
+    {
+        var xValues = row.Select(x => x.Position.X).Order();
+        if (xValues != null && xValues.Count() < 5)
+        {
+            return false;
+        }
+
+        foreach (var x in xValues)
+        {
+            if (xValues.Contains(x + 1) && xValues.Contains(x + 2) && xValues.Contains(x + 3) && xValues.Contains(x + 4))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private long GetSafetyFactor(List<Robot> robots)
+    {
+        return (long)GetRobotsInQuadrant(robots, 1) * (long)GetRobotsInQuadrant(robots, 2) * (long)GetRobotsInQuadrant(robots, 3) * (long)GetRobotsInQuadrant(robots, 4);
+    }
+
+    private static int GetRobotsInQuadrant(List<Robot> robots, int quadrant)
+    {
+        var halfX = MaxWidth / 2;
+        var halfY = MaxHeight / 2;
+
+        return robots
+            .Count(x => quadrant switch
+                {
+                    1 => x.Position.X < halfX && x.Position.Y < halfY,
+                    2 => x.Position.X > halfX && x.Position.Y < halfY,
+                    3 => x.Position.X < halfX && x.Position.Y > halfY,
+                    _ => x.Position.X > halfX && x.Position.Y > halfY,
+                });
+    }
+
+    private static List<Robot> FindNewPositions(List<Robot> robots, int seconds = 1) =>
+        robots
+        .Select(x => GetNewState(x, seconds))
+        .ToList();
+
+    private static Robot GetNewState(Robot robot, int iterations = 1)
+    {
+        var newPosition = new LkVector2((robot.Position.X + iterations * robot.Velocity.X) % MaxWidth, (robot.Position.Y + iterations * robot.Velocity.Y) % MaxHeight);
+
+        while (newPosition.X < 0)
+        {
+            newPosition.X += MaxWidth;
+        }
+
+        while (newPosition.Y < 0)
+        {
+            newPosition.Y += MaxHeight;
+        }
+
+        return new Robot
+        {
+            Position = newPosition,
+            Velocity = robot.Velocity,
+        };
+    }
+
+    private void LoadRobots()
+    {
+        Robots = Input
+            .Select(x =>
+            {
+                var position = x.Split(" ")[0];
+                var velocity = x.Split(" ")[1];
+                return new Robot
+                {
+                    Position = StringToVector(position),
+                    Velocity = StringToVector(velocity),
+                };
+            })
+            .ToList();
+        RobotPositions = Robots.GroupBy(x => (x.Position.X, x.Position.Y)).ToDictionary(x => x.Key, x => x.ToList());
+    }
+
+    private static LkVector2 StringToVector(string s)
+    {
+        var numbers = s.Split('=').Last().Split(',').Select(x => decimal.TryParse(x, out var d) ? d : decimal.MinValue).ToList();
+
+        return new LkVector2(numbers[0], numbers[1]);
+
+    }
+
+    private class Robot
+    {
+        public LkVector2 Position { get; set; }
+        public LkVector2 Velocity { get; set; }
     }
 }

@@ -4,7 +4,7 @@
 <PageTitle>Day @DayNumber</PageTitle>
 
 <div class="container-fluid">
-    <div class="d-flex justify-content-between">
+    <div class="d-flex justify-content-between mb-4">
         <h1>Day @DayNumber</h1>
 
         <div class="d-flex justify-content-around gap-4 flex-grow-1">
@@ -18,6 +18,38 @@
         </div>
     </div>
 
+    <table class="table table-sm table-bordered" style="font-size: 5px; font-family: Consolas">
+        <thead>
+        <tr>
+            <th></th>
+                @foreach (var c in Map[0].Index())
+                {
+                    <th class="text-center">@c.Index</th>
+                }
+        </tr>
+        </thead>
+        <tbody>
+        @foreach (var row in Map.Index())
+        {
+            <tr>
+                <th class="text-center">@row.Index</th>
+                @foreach (var c in row.Item)
+                {
+                    var cellClass = c == WallChar
+                        ? "table-dark"
+                        : c == StartChar
+                            ? "table-success"
+                            : c == EndChar
+                                ? "table-danger"
+                                : string.Empty;
+
+                    <td class="@cellClass text-center">@c</td>
+                }
+            </tr>
+        }
+        </tbody>
+    </table>
+
 </div>
 
 @code {
@@ -27,6 +59,16 @@
     private long Part2Result { get; set; } = 0;
 
     private List<string> Input = new();
+    private List<List<char>> Map = new();
+    private LkVector2 StartPosition = new();
+    private LkVector2 EndPosition = new();
+
+    private List<List<Node>> Paths = new();
+
+    private static readonly char StartChar = 'S';
+    private static readonly char EndChar = 'E';
+    private static readonly char WallChar = '#';
+    private static readonly char OpenChar = '.';
 
     protected override void OnInitialized()
     {
@@ -34,10 +76,11 @@
         {
             var filePath = Path.Combine(WebHostEnvironment.WebRootPath, $"day{DayNumber}.txt");
             var file = File.ReadAllText(filePath);
-            Input =  file
+            Input = file
                 .Split("\n")
                 .Where(x => !string.IsNullOrWhiteSpace(x))
                 .ToList();
+            LoadMap1();
         }
         catch (Exception e)
         {
@@ -47,9 +90,195 @@
 
     private void Part1()
     {
+        LoadMap1();
+
+        Paths = FindAllPaths();
+
+        Part1Result = Paths.Select(GetPathScore).Min();
+    }
+
+    private void LoadMap1()
+    {
+        Map = Input
+            .Where(x => x.StartsWith(WallChar))
+            .Select(x => x.ToList())
+            .ToList();
+        var startRow = Map.FirstOrDefault(x => x.Contains(StartChar));
+        StartPosition = new LkVector2(startRow.IndexOf(StartChar), Map.IndexOf(startRow));
+
+        var endRow = Map.FirstOrDefault(x => x.Contains(EndChar));
+        EndPosition = new LkVector2(endRow.IndexOf(EndChar), Map.IndexOf(endRow));
+    }
+
+    private List<List<Node>> FindAllPaths()
+    {
+        var startingPath = new List<Node>
+        {
+            new(Direction.Right, StartPosition),
+        };
+
+        return NextSteps(startingPath)
+            .Where(x => x.Select(y => y.Position).Contains(EndPosition))
+            .ToList();
+    }
+
+    private List<Node> NextSteps(Node current)
+    {
+        List<Node> possiblePaths = [];
+
+        var straight = GetNextPosition(current.Position, current.Direction);
+        if (straight.Equals(EndPosition))
+        {
+            possiblePaths.Add(new Node(current.Direction, straight));
+        }
+
+        var counterClockwise = TurnCounterClockwise(current.Direction);
+        var nextCCw = GetNextPosition(current.Position, counterClockwise);
+        if (nextCCw.Equals(EndPosition))
+        {
+            possiblePaths.Add(new Node(counterClockwise, nextCCw));
+        }
+
+        var clockwise = TurnClockwise(current.Direction);
+        var nextCw = GetNextPosition(current.Position, clockwise);
+        if (nextCCw.Equals(EndPosition))
+        {
+            possiblePaths.Add(new Node(clockwise, nextCw));
+        }
+
+        return possiblePaths;
+    }
+
+    private List<List<Node>> NextSteps(List<Node> currentPath)
+    {
+        var current = currentPath.LastOrDefault();
+        var newPaths = new List<List<Node>>();
+
+        var straight = GetNextPosition(current.Position, current.Direction);
+        if (straight.Equals(EndPosition))
+        {
+            return [[..currentPath, new Node(current.Direction, straight)]];
+        }
+
+        var counterClockwise = TurnCounterClockwise(current.Direction);
+        var nextCCw = GetNextPosition(current.Position, counterClockwise);
+        if (nextCCw.Equals(EndPosition))
+        {
+            return [[..currentPath, new Node(counterClockwise, nextCCw)]];
+        }
+
+        var clockwise = TurnClockwise(current.Direction);
+        var nextCw = GetNextPosition(current.Position, clockwise);
+        if (nextCCw.Equals(EndPosition))
+        {
+            return [[..currentPath, new Node(clockwise, nextCw)]];
+        }
+
+        if (PositionIsValid(straight))
+        {
+            var straightPaths = NextSteps([..currentPath, new Node(current.Direction, straight)]);
+            newPaths.AddRange(straightPaths.Where(x => x.Select(y => y.Position).Contains(EndPosition)));
+        }
+
+        if (PositionIsValid(nextCCw))
+        {
+            var counterClockWisePaths = NextSteps([..currentPath, new Node(counterClockwise, nextCCw)]);
+            newPaths.AddRange(counterClockWisePaths.Where(x => x.Select(y => y.Position).Contains(EndPosition)));
+        }
+
+        if (PositionIsValid(nextCw))
+        {
+            var clockWisePaths = NextSteps([..currentPath, new Node(clockwise, nextCw)]);
+            newPaths.AddRange(clockWisePaths.Where(x => x.Select(y => y.Position).Contains(EndPosition)));
+        }
+
+        if (newPaths.Count == 0)
+        {
+            return [currentPath];
+        }
+
+        return newPaths.Any(x => x.Select(y => y.Position).Contains(EndPosition))
+            ? newPaths.Where(x => x.Select(y => y.Position).Contains(EndPosition)).ToList()
+            : [currentPath];
+    }
+
+    private long GetPathScore(List<Node> path)
+    {
+        var stepScore = 1;
+        var turnScore = 1000;
+
+        var score = 0;
+        for (var i = 1; i < path.Count; i++)
+        {
+            var current = path[i];
+            var previous = path[i - 1];
+
+            score += stepScore;
+            if (current.Direction != previous.Direction)
+            {
+                score += turnScore;
+            }
+        }
+
+        return score;
+    }
+
+    private bool PositionIsValid(LkVector2 position)
+    {
+        if (position.Y < 0 || position.Y >= Map.Count || position.X < 0 || position.X >= Map.FirstOrDefault().Count)
+        {
+            return false;
+        }
+
+        return Map[(int)position.Y][(int)position.X] == OpenChar;
     }
 
     private void Part2()
     {
+    }
+
+    private class Node
+    {
+        public Node(Direction d, LkVector2 p)
+        {
+            Direction = d;
+            Position = p;
+        }
+
+        public Direction Direction { get; set; }
+        public LkVector2 Position { get; set; }
+    }
+
+    private LkVector2 GetNextPosition(LkVector2 position, Direction direction) => direction switch
+    {
+        Direction.Up => new(position.X, position.Y - 1),
+        Direction.Right => new(position.X + 1, position.Y),
+        Direction.Down => new(position.X, position.Y + 1),
+        Direction.Left => new(position.X - 1, position.Y),
+        _ => new(position.X, position.Y),
+    };
+
+    private Direction TurnClockwise(Direction direction) => direction switch
+    {
+        Direction.Up => Direction.Right,
+        Direction.Right => Direction.Down,
+        Direction.Down => Direction.Left,
+        Direction.Left => Direction.Up,
+    };
+
+    private Direction TurnCounterClockwise(Direction direction) => direction switch
+    {
+        Direction.Up => Direction.Left,
+        Direction.Right => Direction.Up,
+        Direction.Down => Direction.Right,
+        Direction.Left => Direction.Down,
+    };
+
+    private enum Direction
+    {
+        Up,
+        Right,
+        Down,
+        Left,
     }
 }
