@@ -4,8 +4,13 @@
 <PageTitle>Day @DayNumber</PageTitle>
 
 <div class="container-fluid">
-    <div class="d-flex justify-content-between">
+    <div class="d-flex justify-content-between mb-4">
         <h1>Day @DayNumber</h1>
+
+        <div class="d-flex justify-content-start gap-4 mx-3">
+            <p class="p-1">Incoming: @Incoming.Count</p>
+            <p class="p-1">Checked: @CheckedNodes.Count</p>
+        </div>
 
         <div class="d-flex justify-content-around gap-4 flex-grow-1">
             <h4 class="border border-primary p-1">Part1 Result: @Part1Result</h4>
@@ -18,6 +23,43 @@
         </div>
     </div>
 
+    <table class="table table-sm table-bordered" style="font-size: 6px; font-family: Consolas">
+        <thead>
+            <tr class="table-secondary">
+                <th></th>
+                @for (var x = 0; x < Width; x++)
+                {
+                    <th class="text-center m-0 p-0">@x</th>
+                }
+            </tr>
+        </thead>
+        <tbody>
+        @for (var y = 0; y < Height; y++)
+        {
+            <tr>
+                <td class="text-center table-secondary m-0 p-0">@y</td>
+                @for (var x = 0; x < Width; x++)
+                {
+                    var isStart = Start.X == x && Start.Y == y;
+                    var isEnd = End.X == x && End.Y == y;
+
+                    var cssClass = isStart
+                        ? "table-success"
+                        : isEnd
+                            ? "table-primary"
+                            : Grid.Contains((x, y))
+                                ? "table-dark"
+                                : CheckedNodes.ContainsKey((x, y))
+                                    ? "table-warning"
+                                        : string.Empty;
+
+                    <td class="text-center @cssClass m-0 p-0">@GetText(x, y)</td>
+                }
+            </tr>
+        }
+        </tbody>
+    </table>
+
 </div>
 
 @code {
@@ -27,6 +69,16 @@
     private long Part2Result { get; set; } = 0;
 
     private List<string> Input = new();
+    private List<LkVector2> Incoming = new();
+
+    private int Width = 71;
+    private int Height = 71;
+
+    private HashSet<(int X, int Y)> Grid = new();
+    private LkVector2 Start = new(0, 0);
+    private LkVector2 End = new(70, 70);
+
+    private Dictionary<(int X, int Y), int> CheckedNodes = new();
 
     protected override void OnInitialized()
     {
@@ -38,6 +90,10 @@
                 .Split("\n")
                 .Where(x => !string.IsNullOrWhiteSpace(x))
                 .ToList();
+
+            Incoming = Input
+                .Select(x => new LkVector2(int.Parse(x.Split(',')[0]), int.Parse(x.Split(',')[1])))
+                .ToList();
         }
         catch (Exception e)
         {
@@ -45,11 +101,135 @@
         }
     }
 
-    private void Part1()
+    private async Task Part1()
     {
+        var droppedBytes = Incoming.Take(1024).ToList();
+        Incoming = Incoming.Except(droppedBytes).ToList();
+
+        foreach (var b in droppedBytes)
+        {
+            Grid.Add(((int)b.X, (int)b.Y));
+        }
+
+        await FindAllPaths();
     }
 
-    private void Part2()
+    private async Task Part2()
     {
+        var droppedBytes = Incoming.Take(2048).ToList();
+        Incoming = Incoming.Except(droppedBytes).ToList();
+
+        foreach (var b in droppedBytes)
+        {
+            Grid.Add(((int)b.X, (int)b.Y));
+        }
+
+        await FindAllPaths();
+
+        while (Incoming.Any())
+        {
+            var remaining = Incoming.First();
+            Grid.Add(((int)remaining.X, (int)remaining.Y));
+            await FindAllPaths();
+            if (!CheckedNodes.ContainsKey((70, 70)) || CheckedNodes[(70, 70)] < 0)
+            {
+                Console.WriteLine($"Last: {remaining}");
+                Part2Result = CheckedNodes[(70, 70)];
+                break;
+            }
+
+            Incoming.Remove(remaining);
+
+            Console.WriteLine($"{Incoming.Count} | Added ({remaining.X},{remaining.Y}) | End: {CheckedNodes[(70, 70)]}");
+        }
+    }
+
+    private async Task FindAllPaths()
+    {
+        CheckedNodes = new Dictionary<(int X, int Y), int>();
+
+        // Create a set of all unvisited nodes: the unvisited set.
+        var unvisited = Enumerable.Range(0, Height)
+            .SelectMany(y => Enumerable.Range(0, Width).Select(x => (X: x, Y: y)))
+            .ToDictionary(x => x, _ => int.MaxValue);
+
+        // Assign to every node a distance from start value: for the starting node, it is zero, and for all other nodes,
+        // it is infinity, since initially no path is known to these nodes. During execution, the distance of a node N
+        // is the length of the shortest path discovered so far between the starting node and N.
+        unvisited[(0, 0)] = 0;
+
+        // From the unvisited set, select the current node to be the one with the smallest (finite) distance; initially,
+        // this is the starting node (distance zero). If the unvisited set is empty, or contains only nodes with
+        // infinite distance (which are unreachable), then the algorithm terminates by skipping to step 6. If the only
+        // concern is the path to a target node, the algorithm terminates once the current node is the target node.
+        // Otherwise, the algorithm continues.
+        while (unvisited.Any())
+        {
+            var current = unvisited.MinBy(x => x.Value).Key;
+
+            // For the current node, consider all of its unvisited neighbors and update their distances through the current
+            // node; compare the newly calculated distance to the one currently assigned to the neighbor and assign the
+            // smaller one to it. For example, if the current node A is marked with a distance of 6, and the edge connecting
+            // it with its neighbor B has length 2, then the distance to B through A is 6 + 2 = 8. If B was previously
+            // marked with a distance greater than 8, then update it to 8 (the path to B through A is shorter).
+            // Otherwise, keep its current distance (the path to B through A is not the shortest).
+            var neighbours = GetNeighbours((current.X, current.Y));
+            foreach (var neighbour in neighbours)
+            {
+                if (unvisited.ContainsKey(neighbour))
+                {
+                    var distance = unvisited[current] + 1;
+                    if (distance < unvisited[neighbour])
+                    {
+                        unvisited[neighbour] = distance;
+                    }
+                }
+            }
+
+            // After considering all of the current node's unvisited neighbors, the current node is removed from the
+            // unvisited set. Thus a visited node is never rechecked, which is correct because the distance recorded on
+            // the current node is minimal (as ensured in step 3), and thus final. Repeat from to step 3.
+            CheckedNodes.TryAdd(current, unvisited[current]);
+            unvisited.Remove(current);
+
+            if (unvisited.Count % 500 == 0)
+            {
+                await InvokeAsync(StateHasChanged);
+                await Task.Delay(1);
+            }
+        }
+
+        // Once the loop exits (steps 3–5), every visited node contains its shortest distance from the starting node.
+        Part1Result = CheckedNodes[(70, 70)];
+
+    }
+
+    private List<(int X, int Y)> GetNeighbours((int X, int Y) current) => new List<(int X, int Y)>
+        {
+            (current.X, current.Y + 1),
+            (current.X + 1, current.Y),
+            (current.X, current.Y - 1),
+            (current.X - 1, current.Y),
+        }
+        .Where(PositionIsValid)
+        .ToList();
+
+    private bool PositionIsValid((int X, int Y) position) => !(position.Y < 0 || position.Y >= Height || position.X < 0 || position.X >= Width)
+                                                             && !Grid.Contains((position.X, position.Y));
+
+    private string GetText(int x, int y)
+    {
+        var isStart = Start.X == x && Start.Y == y;
+        var isEnd = End.X == x && End.Y == y;
+        return isStart
+            ? "S"
+            : isEnd
+                ? "E"
+                : Grid.Contains((x, y))
+                    ? "#"
+                    : CheckedNodes.ContainsKey((x, y))
+                        ? CheckedNodes[(x, y)].ToString()
+                        : ".";
+
     }
 }

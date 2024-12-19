@@ -7,6 +7,13 @@
     <div class="d-flex justify-content-between mb-4">
         <h1>Day @DayNumber</h1>
 
+        <div class="d-flex gap-4">
+            <p class="border border-primary p-1">Start: @StartPosition</p>
+            <p class="border border-primary p-1">End: @EndPosition</p>
+            <p class="border border-primary p-1">Checked: @CheckedNodes.Count</p>
+            <p class="border border-primary p-1">Successful: @SuccessfulPaths.Count</p>
+        </div>
+
         <div class="d-flex justify-content-around gap-4 flex-grow-1">
             <h4 class="border border-primary p-1">Part1 Result: @Part1Result</h4>
             <h4 class="border border-primary p-1">Part2 Result: @Part2Result</h4>
@@ -18,7 +25,7 @@
         </div>
     </div>
 
-    <table class="table table-sm table-bordered" style="font-size: 5px; font-family: Consolas">
+    <table class="table table-sm table-bordered" style="font-size: 3px; font-family: Consolas">
         <thead>
         <tr>
             <th></th>
@@ -33,15 +40,19 @@
         {
             <tr>
                 <th class="text-center">@row.Index</th>
-                @foreach (var c in row.Item)
+                @foreach (var (colIdx, c) in row.Item.Index())
                 {
                     var cellClass = c == WallChar
                         ? "table-dark"
-                        : c == StartChar
+                        : c == StartChar || c == EndChar
                             ? "table-success"
-                            : c == EndChar
+                            : LastCheckedNodes.Any(x => x.Position.Equals(new LkVector2(colIdx, row.Index)))
                                 ? "table-danger"
-                                : string.Empty;
+                                : CurrentPaths.Any(x => x.Any(y => y.Position.Equals(new LkVector2(colIdx, row.Index))))
+                                    ? "table-primary"
+                                    : CheckedNodes.Any(x => x.Key.Equals(new LkVector2(colIdx, row.Index)))
+                                        ? "table-warning"
+                                        : string.Empty;
 
                     <td class="@cellClass text-center">@c</td>
                 }
@@ -64,6 +75,10 @@
     private LkVector2 EndPosition = new();
 
     private List<List<Node>> Paths = new();
+    private List<List<Node>> CurrentPaths = new();
+    private List<List<Node>> SuccessfulPaths = new();
+    private Dictionary<LkVector2, List<Node>> CheckedNodes = new();
+    private HashSet<Node> LastCheckedNodes = new();
 
     private static readonly char StartChar = 'S';
     private static readonly char EndChar = 'E';
@@ -88,13 +103,13 @@
         }
     }
 
-    private void Part1()
+    private async Task Part1()
     {
         LoadMap1();
 
-        Paths = FindAllPaths();
+        Paths = await FindAllPaths();
 
-        Part1Result = Paths.Select(GetPathScore).Min();
+        Part1Result = Paths.Count > 0 ? Paths.Select(GetPathScore).Min() : -1;
     }
 
     private void LoadMap1()
@@ -110,96 +125,115 @@
         EndPosition = new LkVector2(endRow.IndexOf(EndChar), Map.IndexOf(endRow));
     }
 
-    private List<List<Node>> FindAllPaths()
+    private async Task<List<List<Node>>> FindAllPaths()
     {
-        var startingPath = new List<Node>
+        var startNode = new Node(Direction.Right, StartPosition);
+        CurrentPaths = NextSteps(new List<Node> { startNode });
+
+        foreach (var node in CurrentPaths)
         {
-            new(Direction.Right, StartPosition),
-        };
-
-        return NextSteps(startingPath)
-            .Where(x => x.Select(y => y.Position).Contains(EndPosition))
-            .ToList();
-    }
-
-    private List<Node> NextSteps(Node current)
-    {
-        List<Node> possiblePaths = [];
-
-        var straight = GetNextPosition(current.Position, current.Direction);
-        if (straight.Equals(EndPosition))
-        {
-            possiblePaths.Add(new Node(current.Direction, straight));
+            if (!CheckedNodes.TryAdd(node.Last().Position, node))
+            {
+                var nodeScore = GetPathScore(node);
+                var existingScore = GetPathScore(CheckedNodes[node.Last().Position]);
+                CheckedNodes[node.Last().Position] = nodeScore < existingScore ? node : CheckedNodes[node.Last().Position];
+            }
         }
 
-        var counterClockwise = TurnCounterClockwise(current.Direction);
-        var nextCCw = GetNextPosition(current.Position, counterClockwise);
-        if (nextCCw.Equals(EndPosition))
+        SuccessfulPaths = [];
+
+        var count = 0;
+        while (CurrentPaths.Count > 1)
         {
-            possiblePaths.Add(new Node(counterClockwise, nextCCw));
+            var newNodes = new List<List<Node>>();
+            LastCheckedNodes = [];
+            CurrentPaths = CurrentPaths.GroupBy(x => x.Last().Position).Select(x => x.MinBy(GetPathScore)).ToList();
+            foreach (var path in CurrentPaths)
+            {
+                var nextSteps = NextSteps(path);
+                var validSteps = new List<List<Node>>();
+
+                foreach (var newPath in nextSteps)
+                {
+                    var lastPosition = newPath.Last().Position;
+                    if (newPath.Count(x => x.Position.Equals(lastPosition)) > 1)
+                    {
+                        continue;
+                    }
+
+                    if (newPath.Any(n => n.Position.Equals(EndPosition)) || !CheckedNodes.ContainsKey(lastPosition))
+                    {
+                        validSteps.Add(newPath);
+                    }
+                    else if (CheckedNodes.ContainsKey(lastPosition))
+                    {
+                        var nodeScore = GetPathScore(newPath);
+                        var existingScore = GetPathScore(CheckedNodes[lastPosition]);
+                        if (nodeScore < existingScore)
+                        {
+                            CheckedNodes[lastPosition] = newPath;
+                        }
+                    }
+                }
+
+                newNodes.AddRange(validSteps);
+
+                foreach (var node in newNodes)
+                {
+                    LastCheckedNodes.Add(node.Last());
+                    if (!CheckedNodes.TryAdd(node.Last().Position, node))
+                    {
+                        var nodeScore = GetPathScore(node);
+                        var existingScore = GetPathScore(CheckedNodes[node.Last().Position]);
+                        CheckedNodes[node.Last().Position] = nodeScore < existingScore ? node : CheckedNodes[node.Last().Position];
+                    }
+                }
+            }
+
+            CurrentPaths = newNodes;
+            SuccessfulPaths.AddRange(newNodes.Where(x => x.Any(y => y.Position.Equals(EndPosition))));
+            count++;
+
+            if (CurrentPaths.Count < 50 || count % 50 == 0)
+            {
+                await InvokeAsync(StateHasChanged);
+                await Task.Delay(1);
+            }
         }
 
-        var clockwise = TurnClockwise(current.Direction);
-        var nextCw = GetNextPosition(current.Position, clockwise);
-        if (nextCCw.Equals(EndPosition))
-        {
-            possiblePaths.Add(new Node(clockwise, nextCw));
-        }
-
-        return possiblePaths;
+        return CurrentPaths;
     }
 
     private List<List<Node>> NextSteps(List<Node> currentPath)
     {
-        var current = currentPath.LastOrDefault();
-        var newPaths = new List<List<Node>>();
+        var current = currentPath.Last();
+        List<List<Node>> possiblePaths = [];
 
-        var straight = GetNextPosition(current.Position, current.Direction);
-        if (straight.Equals(EndPosition))
+        if (current.Equals(EndPosition))
         {
-            return [[..currentPath, new Node(current.Direction, straight)]];
-        }
-
-        var counterClockwise = TurnCounterClockwise(current.Direction);
-        var nextCCw = GetNextPosition(current.Position, counterClockwise);
-        if (nextCCw.Equals(EndPosition))
-        {
-            return [[..currentPath, new Node(counterClockwise, nextCCw)]];
-        }
-
-        var clockwise = TurnClockwise(current.Direction);
-        var nextCw = GetNextPosition(current.Position, clockwise);
-        if (nextCCw.Equals(EndPosition))
-        {
-            return [[..currentPath, new Node(clockwise, nextCw)]];
-        }
-
-        if (PositionIsValid(straight))
-        {
-            var straightPaths = NextSteps([..currentPath, new Node(current.Direction, straight)]);
-            newPaths.AddRange(straightPaths.Where(x => x.Select(y => y.Position).Contains(EndPosition)));
-        }
-
-        if (PositionIsValid(nextCCw))
-        {
-            var counterClockWisePaths = NextSteps([..currentPath, new Node(counterClockwise, nextCCw)]);
-            newPaths.AddRange(counterClockWisePaths.Where(x => x.Select(y => y.Position).Contains(EndPosition)));
-        }
-
-        if (PositionIsValid(nextCw))
-        {
-            var clockWisePaths = NextSteps([..currentPath, new Node(clockwise, nextCw)]);
-            newPaths.AddRange(clockWisePaths.Where(x => x.Select(y => y.Position).Contains(EndPosition)));
-        }
-
-        if (newPaths.Count == 0)
-        {
+            Console.WriteLine($"Found end at {current}");
             return [currentPath];
         }
 
-        return newPaths.Any(x => x.Select(y => y.Position).Contains(EndPosition))
-            ? newPaths.Where(x => x.Select(y => y.Position).Contains(EndPosition)).ToList()
-            : [currentPath];
+        var straight = GetNextPosition(current.Position, current.Direction);
+        if (PositionIsValid(straight) && !currentPath.Any(x => x.Position.Equals(straight)))
+        {
+            possiblePaths.Add([..currentPath, new Node(current.Direction, straight)]);
+        }
+
+        var nextCCw = GetNextPosition(current.Position, TurnCounterClockwise(current.Direction));
+        if (PositionIsValid(nextCCw) && !currentPath.Any(x => x.Position.Equals(nextCCw)))
+        {
+            possiblePaths.Add([..currentPath, new Node(TurnCounterClockwise(current.Direction), nextCCw)]);
+        }
+
+        var nextCw = GetNextPosition(current.Position, TurnClockwise(current.Direction));
+        if (PositionIsValid(nextCw) && !currentPath.Any(x => x.Position.Equals(nextCw)))
+        {
+            possiblePaths.Add([..currentPath, new Node(TurnClockwise(current.Direction), nextCw)]);
+        }
+
+        return possiblePaths;
     }
 
     private long GetPathScore(List<Node> path)
@@ -263,7 +297,7 @@
         Direction.Up => Direction.Right,
         Direction.Right => Direction.Down,
         Direction.Down => Direction.Left,
-        Direction.Left => Direction.Up,
+        _ => Direction.Up,
     };
 
     private Direction TurnCounterClockwise(Direction direction) => direction switch
@@ -271,7 +305,7 @@
         Direction.Up => Direction.Left,
         Direction.Right => Direction.Up,
         Direction.Down => Direction.Right,
-        Direction.Left => Direction.Down,
+        _ => Direction.Down,
     };
 
     private enum Direction

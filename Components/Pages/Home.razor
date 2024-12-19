@@ -1,7 +1,48 @@
 ﻿@page "/"
+@inject NavigationManager NavigationManager
 
-<PageTitle>Home</PageTitle>
+<PageTitle>Advent of Code</PageTitle>
 
-<h1>Hello, world!</h1>
+<h1>Advent of Code</h1>
 
-Welcome to your new app.
+<div class="d-flex gap-2 flex-wrap w-50">
+    <NavLink class="btn btn-primary" href="day1">Day 1</NavLink>
+    <NavLink class="btn btn-primary" href="day2">Day 2</NavLink>
+    <NavLink class="btn btn-primary" href="day3">Day 3</NavLink>
+    <NavLink class="btn btn-primary" href="day4">Day 4</NavLink>
+    <NavLink class="btn btn-primary" href="day5">Day 5</NavLink>
+    <NavLink class="btn btn-primary" href="day6">Day 6</NavLink>
+    <NavLink class="btn btn-primary" href="day7">Day 7</NavLink>
+    <NavLink class="btn btn-primary" href="day8">Day 8</NavLink>
+    <NavLink class="btn btn-primary" href="day9">Day 9</NavLink>
+    <NavLink class="btn btn-primary" href="day10">Day 10</NavLink>
+    <NavLink class="btn btn-primary" href="day11">Day 11</NavLink>
+    <NavLink class="btn btn-primary" href="day12">Day 12</NavLink>
+    <NavLink class="btn btn-primary" href="day13">Day 13</NavLink>
+    <NavLink class="btn btn-primary" href="day14">Day 14</NavLink>
+    <NavLink class="btn btn-primary" href="day15">Day 15</NavLink>
+    <NavLink class="btn btn-primary" href="day16">Day 16</NavLink>
+    <NavLink class="btn btn-primary" href="day17">Day 17</NavLink>
+    <NavLink class="btn btn-primary" href="day18">Day 18</NavLink>
+    <NavLink class="btn btn-primary" href="day19">Day 19</NavLink>
+    <NavLink class="btn btn-primary" href="day20">Day 20</NavLink>
+    <NavLink class="btn btn-primary" href="day21">Day 21</NavLink>
+    <NavLink class="btn btn-primary" href="day22">Day 22</NavLink>
+    <NavLink class="btn btn-primary" href="day23">Day 23</NavLink>
+    <NavLink class="btn btn-primary" href="day24">Day 24</NavLink>
+    <NavLink class="btn btn-primary" href="day25">Day 25</NavLink>
+</div>
+
+@code {
+
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (firstRender)
+        {
+            var day = DateTime.Today.Day;
+            NavigationManager.NavigateTo($"/day{day}");
+            StateHasChanged();
+        }
+    }
+
+}
