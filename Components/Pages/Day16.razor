@@ -8,10 +8,7 @@
         <h1>Day @DayNumber</h1>
 
         <div class="d-flex gap-4">
-            <p class="border border-primary p-1">Start: @StartPosition</p>
-            <p class="border border-primary p-1">End: @EndPosition</p>
             <p class="border border-primary p-1">Checked: @CheckedNodes.Count</p>
-            <p class="border border-primary p-1">Successful: @SuccessfulPaths.Count</p>
         </div>
 
         <div class="d-flex justify-content-around gap-4 flex-grow-1">
@@ -25,41 +22,41 @@
         </div>
     </div>
 
-    <table class="table table-sm table-bordered" style="font-size: 3px; font-family: Consolas">
-        <thead>
-        <tr>
-            <th></th>
-                @foreach (var c in Map[0].Index())
-                {
-                    <th class="text-center">@c.Index</th>
-                }
-        </tr>
-        </thead>
-        <tbody>
-        @foreach (var row in Map.Index())
-        {
-            <tr>
-                <th class="text-center">@row.Index</th>
-                @foreach (var (colIdx, c) in row.Item.Index())
-                {
-                    var cellClass = c == WallChar
-                        ? "table-dark"
-                        : c == StartChar || c == EndChar
-                            ? "table-success"
-                            : LastCheckedNodes.Any(x => x.Position.Equals(new LkVector2(colIdx, row.Index)))
-                                ? "table-danger"
-                                : CurrentPaths.Any(x => x.Any(y => y.Position.Equals(new LkVector2(colIdx, row.Index))))
-                                    ? "table-primary"
-                                    : CheckedNodes.Any(x => x.Key.Equals(new LkVector2(colIdx, row.Index)))
-                                        ? "table-warning"
-                                        : string.Empty;
 
-                    <td class="@cellClass text-center">@c</td>
+    <div style="font-size: 5px; font-family: Consolas">
+        <table class="table table-sm table-bordered">
+            <tbody>
+            <tr>
+                <th class="m-0 p-0"></th>
+                @for (var x = 0; x < Width; x++)
+                {
+                    <th class="text-center m-0 p-0">@x</th>
                 }
             </tr>
-        }
-        </tbody>
-    </table>
+            @for (var y = 0; y < Height; y++)
+            {
+                <tr>
+                    <th class="text-center m-0 p-0">@y</th>
+                    @for (var x = 0; x < Width; x++)
+                    {
+                        var value = GetText(x, y);
+                        var cssClass = Paths.Any(p => p.Contains((x, y)))
+                        ? "table-warning"
+                        : value switch
+                            {
+                                "#" => "table-dark",
+                                "%" => "table-danger",
+                                "S" or "E" => "table-primary",
+                                _ => string.Empty
+                            };
+
+                        <td class="text-center m-0 p-0 @cssClass">@value</td>
+                    }
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
 
 </div>
 
@@ -70,15 +67,16 @@
     private long Part2Result { get; set; } = 0;
 
     private List<string> Input = new();
-    private List<List<char>> Map = new();
-    private LkVector2 StartPosition = new();
-    private LkVector2 EndPosition = new();
 
-    private List<List<Node>> Paths = new();
-    private List<List<Node>> CurrentPaths = new();
-    private List<List<Node>> SuccessfulPaths = new();
-    private Dictionary<LkVector2, List<Node>> CheckedNodes = new();
-    private HashSet<Node> LastCheckedNodes = new();
+    private Dictionary<(int X, int Y), char> Grid = new();
+    private Dictionary<(int X, int Y), int> CheckedNodes = new();
+    private int Width { get; set; } = 0;
+    private int Height { get; set; } = 0;
+    private (int X, int Y) Start { get; set; }
+    private (int X, int Y) End { get; set; }
+
+    private List<HashSet<(int X, int Y)>> Paths = new();
+    private HashSet<(int X, int Y)> PathHash = new();
 
     private static readonly char StartChar = 'S';
     private static readonly char EndChar = 'E';
@@ -95,7 +93,7 @@
                 .Split("\n")
                 .Where(x => !string.IsNullOrWhiteSpace(x))
                 .ToList();
-            LoadMap1();
+            LoadGrid();
         }
         catch (Exception e)
         {
@@ -105,214 +103,104 @@
 
     private async Task Part1()
     {
-        LoadMap1();
-
-        Paths = await FindAllPaths();
-
-        Part1Result = Paths.Count > 0 ? Paths.Select(GetPathScore).Min() : -1;
-    }
-
-    private void LoadMap1()
-    {
-        Map = Input
-            .Where(x => x.StartsWith(WallChar))
-            .Select(x => x.ToList())
-            .ToList();
-        var startRow = Map.FirstOrDefault(x => x.Contains(StartChar));
-        StartPosition = new LkVector2(startRow.IndexOf(StartChar), Map.IndexOf(startRow));
-
-        var endRow = Map.FirstOrDefault(x => x.Contains(EndChar));
-        EndPosition = new LkVector2(endRow.IndexOf(EndChar), Map.IndexOf(endRow));
-    }
-
-    private async Task<List<List<Node>>> FindAllPaths()
-    {
-        var startNode = new Node(Direction.Right, StartPosition);
-        CurrentPaths = NextSteps(new List<Node> { startNode });
-
-        foreach (var node in CurrentPaths)
-        {
-            if (!CheckedNodes.TryAdd(node.Last().Position, node))
-            {
-                var nodeScore = GetPathScore(node);
-                var existingScore = GetPathScore(CheckedNodes[node.Last().Position]);
-                CheckedNodes[node.Last().Position] = nodeScore < existingScore ? node : CheckedNodes[node.Last().Position];
-            }
-        }
-
-        SuccessfulPaths = [];
-
-        var count = 0;
-        while (CurrentPaths.Count > 1)
-        {
-            var newNodes = new List<List<Node>>();
-            LastCheckedNodes = [];
-            CurrentPaths = CurrentPaths.GroupBy(x => x.Last().Position).Select(x => x.MinBy(GetPathScore)).ToList();
-            foreach (var path in CurrentPaths)
-            {
-                var nextSteps = NextSteps(path);
-                var validSteps = new List<List<Node>>();
-
-                foreach (var newPath in nextSteps)
-                {
-                    var lastPosition = newPath.Last().Position;
-                    if (newPath.Count(x => x.Position.Equals(lastPosition)) > 1)
-                    {
-                        continue;
-                    }
-
-                    if (newPath.Any(n => n.Position.Equals(EndPosition)) || !CheckedNodes.ContainsKey(lastPosition))
-                    {
-                        validSteps.Add(newPath);
-                    }
-                    else if (CheckedNodes.ContainsKey(lastPosition))
-                    {
-                        var nodeScore = GetPathScore(newPath);
-                        var existingScore = GetPathScore(CheckedNodes[lastPosition]);
-                        if (nodeScore < existingScore)
-                        {
-                            CheckedNodes[lastPosition] = newPath;
-                        }
-                    }
-                }
-
-                newNodes.AddRange(validSteps);
-
-                foreach (var node in newNodes)
-                {
-                    LastCheckedNodes.Add(node.Last());
-                    if (!CheckedNodes.TryAdd(node.Last().Position, node))
-                    {
-                        var nodeScore = GetPathScore(node);
-                        var existingScore = GetPathScore(CheckedNodes[node.Last().Position]);
-                        CheckedNodes[node.Last().Position] = nodeScore < existingScore ? node : CheckedNodes[node.Last().Position];
-                    }
-                }
-            }
-
-            CurrentPaths = newNodes;
-            SuccessfulPaths.AddRange(newNodes.Where(x => x.Any(y => y.Position.Equals(EndPosition))));
-            count++;
-
-            if (CurrentPaths.Count < 50 || count % 50 == 0)
-            {
-                await InvokeAsync(StateHasChanged);
-                await Task.Delay(1);
-            }
-        }
-
-        return CurrentPaths;
-    }
-
-    private List<List<Node>> NextSteps(List<Node> currentPath)
-    {
-        var current = currentPath.Last();
-        List<List<Node>> possiblePaths = [];
-
-        if (current.Equals(EndPosition))
-        {
-            Console.WriteLine($"Found end at {current}");
-            return [currentPath];
-        }
-
-        var straight = GetNextPosition(current.Position, current.Direction);
-        if (PositionIsValid(straight) && !currentPath.Any(x => x.Position.Equals(straight)))
-        {
-            possiblePaths.Add([..currentPath, new Node(current.Direction, straight)]);
-        }
-
-        var nextCCw = GetNextPosition(current.Position, TurnCounterClockwise(current.Direction));
-        if (PositionIsValid(nextCCw) && !currentPath.Any(x => x.Position.Equals(nextCCw)))
-        {
-            possiblePaths.Add([..currentPath, new Node(TurnCounterClockwise(current.Direction), nextCCw)]);
-        }
-
-        var nextCw = GetNextPosition(current.Position, TurnClockwise(current.Direction));
-        if (PositionIsValid(nextCw) && !currentPath.Any(x => x.Position.Equals(nextCw)))
-        {
-            possiblePaths.Add([..currentPath, new Node(TurnClockwise(current.Direction), nextCw)]);
-        }
-
-        return possiblePaths;
-    }
-
-    private long GetPathScore(List<Node> path)
-    {
-        var stepScore = 1;
-        var turnScore = 1000;
-
-        var score = 0;
-        for (var i = 1; i < path.Count; i++)
-        {
-            var current = path[i];
-            var previous = path[i - 1];
-
-            score += stepScore;
-            if (current.Direction != previous.Direction)
-            {
-                score += turnScore;
-            }
-        }
-
-        return score;
-    }
-
-    private bool PositionIsValid(LkVector2 position)
-    {
-        if (position.Y < 0 || position.Y >= Map.Count || position.X < 0 || position.X >= Map.FirstOrDefault().Count)
-        {
-            return false;
-        }
-
-        return Map[(int)position.Y][(int)position.X] == OpenChar;
+        LoadGrid();
+        FindAllPaths();
     }
 
     private void Part2()
     {
     }
 
-    private class Node
+    private void FindAllPaths()
     {
-        public Node(Direction d, LkVector2 p)
-        {
-            Direction = d;
-            Position = p;
-        }
+        Paths = FindAllPaths([End]).Select(x => x.ToHashSet()).ToList();
 
-        public Direction Direction { get; set; }
-        public LkVector2 Position { get; set; }
+        Console.WriteLine($"Found {Paths.Count} paths");
     }
 
-    private LkVector2 GetNextPosition(LkVector2 position, Direction direction) => direction switch
+    private List<List<(int X, int Y)>> FindAllPaths(List<(int X, int Y)> currentPath)
     {
-        Direction.Up => new(position.X, position.Y - 1),
-        Direction.Right => new(position.X + 1, position.Y),
-        Direction.Down => new(position.X, position.Y + 1),
-        Direction.Left => new(position.X - 1, position.Y),
-        _ => new(position.X, position.Y),
-    };
+            var last = currentPath.LastOrDefault();
+            if (CheckedNodes[last] == CheckedNodes[Start])
+            {
+                return [currentPath];
+            }
 
-    private Direction TurnClockwise(Direction direction) => direction switch
-    {
-        Direction.Up => Direction.Right,
-        Direction.Right => Direction.Down,
-        Direction.Down => Direction.Left,
-        _ => Direction.Up,
-    };
+            var nextPaths = GetNeighbours(last)
+                    .Where(x => CheckedNodes[x] == CheckedNodes[last] - 1)
+                    .Select(x => currentPath.Append(x).ToList())
+                    .ToList();
 
-    private Direction TurnCounterClockwise(Direction direction) => direction switch
-    {
-        Direction.Up => Direction.Left,
-        Direction.Right => Direction.Up,
-        Direction.Down => Direction.Right,
-        _ => Direction.Down,
-    };
+            return nextPaths.SelectMany(FindAllPaths).ToList();
+    }
 
-    private enum Direction
+    private void LoadGrid()
     {
-        Up,
-        Right,
-        Down,
-        Left,
+        Grid = Input
+            .SelectMany((row, y) => row.Select((col, x) => ((x, y), col)))
+            .ToDictionary();
+        Width = Input[0].Length;
+        Height = Input.Count;
+        Start = Grid.First(x => x.Value == 'S').Key;
+        End = Grid.First(x => x.Value == 'E').Key;
+        Console.WriteLine("\nGrid loaded");
+        AssignCellDistances();
+        Console.WriteLine("Cell Distances set");
+    }
+
+    private void AssignCellDistances()
+    {
+        var unvisited = Grid.Keys.ToDictionary(x => x, _ => int.MaxValue);
+        unvisited[Start] = 0;
+
+        while (unvisited.Any())
+        {
+            var current = unvisited.MinBy(x => x.Value).Key;
+            var neighbours = GetNeighbours((current.X, current.Y));
+            foreach (var neighbour in neighbours)
+            {
+                if (unvisited.ContainsKey(neighbour))
+                {
+                    var distance = unvisited[current] + 1;
+                    if (distance < unvisited[neighbour])
+                    {
+                        unvisited[neighbour] = distance;
+                    }
+                }
+            }
+
+            CheckedNodes.TryAdd(current, unvisited[current]);
+            unvisited.Remove(current);
+        }
+    }
+
+    private List<(int X, int Y)> GetNeighbours((int X, int Y) current) => new List<(int X, int Y)>
+        {
+            (current.X, current.Y + 1),
+            (current.X + 1, current.Y),
+            (current.X, current.Y - 1),
+            (current.X - 1, current.Y),
+        }
+        .Where(PositionIsValid)
+        .ToList();
+
+    private bool PositionIsValid((int X, int Y) position) =>
+        !(position.Y < 0 || position.Y >= Height || position.X < 0 || position.X >= Width)
+        && Grid.GetValueOrDefault((position.X, position.Y)) != '#';
+
+    private string GetText(int x, int y)
+    {
+        var isStart = Start.X == x && Start.Y == y;
+        var isEnd = End.X == x && End.Y == y;
+        return isStart
+            ? "S"
+            : isEnd
+                ? "E"
+                : Grid.GetValueOrDefault((x, y)) == '#'
+                    ? "#"
+                    : CheckedNodes.ContainsKey((x, y))
+                        ? CheckedNodes[(x, y)].ToString()
+                        : ".";
+
     }
 }

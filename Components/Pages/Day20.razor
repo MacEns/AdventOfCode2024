@@ -210,25 +210,6 @@
         var currentDistance = CheckedNodes[current];
 
         var cheatPositions = new List<(int X, int Y)>();
-        // for (var y = 0; y <= cheatTime; y++)
-        // {
-        //     for (var x = 0; x + y <= cheatTime; x++)
-        //     {
-        //         var positions = new List<(int X, int Y)>
-        //         {
-        //             (current.X + x, current.Y + y),
-        //             (current.X + x, current.Y - y),
-        //             (current.X - x, current.Y + y),
-        //             (current.X - x, current.Y - y),
-        //         }
-        //         .Where(p => IsOnPath(p) && CheckedNodes[p] > currentDistance + minValue && CheckedNodes[p] < CheckedNodes[End]);
-        //
-        //         foreach (var position in positions)
-        //         {
-        //             cheatPositions.Add(position);
-        //         }
-        //     }
-        // }
 
         foreach (var node in PathHash)
         {
@@ -244,11 +225,6 @@
 
             cheatPositions.Add(node);
         }
-
-        // cheatPositions = PathHash
-        //     .Where(x => CheckedNodes[x] > currentDistance + minValue && ManhattanDistance(current, x) <= cheatTime)
-        //     .Where(x => CheckedNodes[End] - currentDistance + ManhattanDistance(current, x) >= minValue)
-        //     .ToList();
 
         return cheatPositions
             .DistinctBy(x => $"{x.X},{x.Y}")
