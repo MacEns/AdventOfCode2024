@@ -4,10 +4,10 @@
 <PageTitle>Day @DayNumber</PageTitle>
 
 <div class="container-fluid">
-    <div class="d-flex justify-content-between">
+    <div class="d-flex justify-content-start gap-2 mb-4">
         <h1>Day @DayNumber</h1>
 
-        <div class="d-flex justify-content-around gap-4 flex-grow-1">
+        <div class="d-flex justify-content-around gap-4">
             <h4 class="border border-primary p-1">Part1 Result: @Part1Result</h4>
             <h4 class="border border-primary p-1">Part2 Result: @Part2Result</h4>
         </div>
@@ -16,6 +16,41 @@
             <button class="btn btn-primary" @onclick="Part1">Part 1</button>
             <button class="btn btn-primary" @onclick="Part2" >Part 2</button>
         </div>
+    </div>
+
+    <div style="font-size: 10px; font-family: Consolas">
+        <table class="table table-sm table-bordered">
+            <tbody>
+            <tr>
+                <th class="m-0 p-0"></th>
+                @for (var x = 0; x < Width; x++)
+                {
+                    <th class="text-center m-0 p-0">@x</th>
+                }
+            </tr>
+            @for (var y = 0; y < Height; y++)
+            {
+                <tr>
+                    <th class="text-center m-0 p-0">@y</th>
+                    @for (var x = 0; x < Width; x++)
+                    {
+                        var value = GetText(x, y);
+                        var cssClass = (ValidPath?.Any(p => p.X == x && p.Y == y) ?? false) && value != "S" && value != "E"
+                            ? "table-warning"
+                            : value switch
+                            {
+                                "#" => "table-dark",
+                                "%" => "table-danger",
+                                "S" or "E" => "table-primary",
+                                _ => string.Empty
+                            };
+
+                        <td class="text-center m-0 p-0 @cssClass">@value</td>
+                    }
+                </tr>
+            }
+            </tbody>
+        </table>
     </div>
 
 </div>
@@ -28,28 +63,222 @@
 
     private List<string> Input = new();
 
-    protected override void OnInitialized()
+    private Dictionary<(int X, int Y), char> Grid = new();
+    private Dictionary<(int X, int Y), int> CheckedNodes = new();
+    private int Width { get; set; } = 0;
+    private int Height { get; set; } = 0;
+    private (int X, int Y) Start { get; set; }
+    private (int X, int Y) End { get; set; }
+
+    private List<(int X, int Y)> ValidPath = new();
+    private HashSet<(int X, int Y)> PathHash = new();
+
+    protected override void OnAfterRender(bool firstRender)
     {
-        try
+        if (firstRender)
         {
-            var filePath = Path.Combine(WebHostEnvironment.WebRootPath, $"day{DayNumber}.txt");
-            var file = File.ReadAllText(filePath);
-            Input =  file
-                .Split("\n")
-                .Where(x => !string.IsNullOrWhiteSpace(x))
+            try
+            {
+                var filePath = Path.Combine(WebHostEnvironment.WebRootPath, $"day{DayNumber}.txt");
+                var file = File.ReadAllText(filePath);
+                Input =  file
+                    .Split("\n")
+                    .Where(x => !string.IsNullOrWhiteSpace(x))
+                    .ToList();
+                LoadGrid();
+                FindAllPaths();
+                StateHasChanged();
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine(e);
+            }
+        }
+    }
+
+    private async Task Part1()
+    {
+        Console.WriteLine("Finding cheats");
+        var cheats = new List<Cheat>();
+        foreach (var node in ValidPath)
+        {
+            cheats.AddRange(FindValidCheats(node, 2));
+        }
+
+        Console.WriteLine($"Found {cheats.Count} cheats");
+        Part1Result = cheats.Count;
+    }
+
+    private async Task Part2()
+    {
+        Console.WriteLine("Finding cheats");
+        var cheats = new List<Cheat>();
+        var startTime = DateTime.Now;
+        foreach (var node in ValidPath)
+        {
+            cheats.AddRange(FindValidCheats(node, 20));
+        }
+
+        cheats = cheats
+            .DistinctBy(x => $"{x.Start.X},{x.Start.Y} => {x.End.X},{x.End.Y}")
+            .ToList();
+        Console.WriteLine($"Found {cheats.Count} cheats in {(DateTime.Now - startTime).TotalSeconds} seconds");
+        Part2Result = cheats.Count;
+    }
+
+    private void FindAllPaths()
+    {
+        ValidPath = [];
+        ValidPath = FindAllPaths([End]);
+        ValidPath.Reverse();
+
+        PathHash = new HashSet<(int X, int Y)>(ValidPath);
+
+        Console.WriteLine($"Found path");
+    }
+
+    private List<(int X, int Y)> FindAllPaths(List<(int X, int Y)> currentPath)
+    {
+        while (true)
+        {
+            var last = currentPath.LastOrDefault();
+            if (CheckedNodes[last] == CheckedNodes[Start])
+            {
+                return currentPath;
+            }
+
+            var nextPath = currentPath.Append(GetNeighbours(last).FirstOrDefault(x => CheckedNodes[x] == CheckedNodes[last] - 1))
                 .ToList();
+
+            currentPath = nextPath;
         }
-        catch (Exception e)
+    }
+
+    private void LoadGrid()
+    {
+        Grid = Input
+            .SelectMany((row, y) => row.Select((col, x) => ((x, y), col)))
+            .ToDictionary();
+        Width = Input[0].Length;
+        Height = Input.Count;
+        Start = Grid.First(x => x.Value == 'S').Key;
+        End = Grid.First(x => x.Value == 'E').Key;
+        Console.WriteLine("\nGrid loaded");
+        AssignCellDistances();
+        Console.WriteLine("Cell Distances set");
+    }
+
+    private void AssignCellDistances()
+    {
+        var unvisited = Grid.Keys.ToDictionary(x => x, _ => int.MaxValue);
+        unvisited[Start] = 0;
+
+        while (unvisited.Any())
         {
-            Console.WriteLine(e);
+            var current = unvisited.MinBy(x => x.Value).Key;
+            var neighbours = GetNeighbours((current.X, current.Y));
+            foreach (var neighbour in neighbours)
+            {
+                if (unvisited.ContainsKey(neighbour))
+                {
+                    var distance = unvisited[current] + 1;
+                    if (distance < unvisited[neighbour])
+                    {
+                        unvisited[neighbour] = distance;
+                    }
+                }
+            }
+
+            CheckedNodes.TryAdd(current, unvisited[current]);
+            unvisited.Remove(current);
         }
     }
 
-    private void Part1()
+    private List<(int X, int Y)> GetNeighbours((int X, int Y) current) => new List<(int X, int Y)>
+        {
+            (current.X, current.Y + 1),
+            (current.X + 1, current.Y),
+            (current.X, current.Y - 1),
+            (current.X - 1, current.Y),
+        }
+        .Where(PositionIsValid)
+        .ToList();
+
+    private List<Cheat> FindValidCheats((int X, int Y) current, int cheatTime)
     {
+        var minValue = 100;
+        var currentDistance = CheckedNodes[current];
+
+        var cheatPositions = new List<(int X, int Y)>();
+        // for (var y = 0; y <= cheatTime; y++)
+        // {
+        //     for (var x = 0; x + y <= cheatTime; x++)
+        //     {
+        //         var positions = new List<(int X, int Y)>
+        //         {
+        //             (current.X + x, current.Y + y),
+        //             (current.X + x, current.Y - y),
+        //             (current.X - x, current.Y + y),
+        //             (current.X - x, current.Y - y),
+        //         }
+        //         .Where(p => IsOnPath(p) && CheckedNodes[p] > currentDistance + minValue && CheckedNodes[p] < CheckedNodes[End]);
+        //
+        //         foreach (var position in positions)
+        //         {
+        //             cheatPositions.Add(position);
+        //         }
+        //     }
+        // }
+
+        foreach (var node in PathHash)
+        {
+            if (CheckedNodes[node] - currentDistance - ManhattanDistance(current, node) < minValue)
+            {
+                continue;
+            }
+
+            if (ManhattanDistance(current, node) > cheatTime)
+            {
+                continue;
+            }
+
+            cheatPositions.Add(node);
+        }
+
+        // cheatPositions = PathHash
+        //     .Where(x => CheckedNodes[x] > currentDistance + minValue && ManhattanDistance(current, x) <= cheatTime)
+        //     .Where(x => CheckedNodes[End] - currentDistance + ManhattanDistance(current, x) >= minValue)
+        //     .ToList();
+
+        return cheatPositions
+            .DistinctBy(x => $"{x.X},{x.Y}")
+            .Select(x => new Cheat(current, x))
+            .ToList();
     }
 
-    private void Part2()
+    private int ManhattanDistance((int X, int Y) start, (int X, int Y) end) => Math.Abs(end.X - start.X) + Math.Abs(end.Y - start.Y);
+
+    private bool PositionIsValid((int X, int Y) position) =>
+        !(position.Y < 0 || position.Y >= Height || position.X < 0 || position.X >= Width)
+        && Grid.GetValueOrDefault((position.X, position.Y)) != '#';
+
+    private bool IsOnPath((int X, int Y) position) => PathHash.Contains(position);
+
+    private string GetText(int x, int y)
     {
+        var isStart = Start.X == x && Start.Y == y;
+        var isEnd = End.X == x && End.Y == y;
+        return isStart
+            ? "S"
+            : isEnd
+                ? "E"
+                : Grid.GetValueOrDefault((x, y)) == '#'
+                    ? "#"
+                    : CheckedNodes.ContainsKey((x, y))
+                        ? CheckedNodes[(x, y)].ToString()
+                        : ".";
+
     }
+
+    private record Cheat((int X, int Y) Start, (int X, int Y) End);
 }
