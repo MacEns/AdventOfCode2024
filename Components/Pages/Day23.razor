@@ -1,10 +1,10 @@
-﻿@page "/23"
+﻿@page "/day23"
 @inject IWebHostEnvironment WebHostEnvironment
 
 <PageTitle>Day @DayNumber</PageTitle>
 
 <div class="container-fluid">
-    <div class="d-flex justify-content-between">
+    <div class="d-flex justify-content-between mb-2">
         <h1>Day @DayNumber</h1>
 
         <div class="d-flex justify-content-around gap-4 flex-grow-1">
@@ -17,6 +17,24 @@
             <button class="btn btn-primary" @onclick="Part2" >Part 2</button>
         </div>
     </div>
+    
+    <div class="d-flex justify-content-start gap-4" style="font-family: Consolas">
+        <div class="d-flex flex-column px-2 border">
+            @foreach (var line in Input.Order())
+            {
+                <p class="my-0">@line</p>
+            }
+        </div>
+        
+        <div class="d-flex flex-column px-2 border">
+            @foreach (var party in Parties)
+            {
+                <p class="my-0">@string.Join(", ", party)</p>
+            }
+        </div>
+    </div>
+
+
 
 </div>
 
@@ -28,6 +46,10 @@
 
     private List<string> Input = new();
 
+    private Dictionary<string, List<string>> Connections = new();
+    private List<List<string>> Parties = new();
+
+
     protected override void OnInitialized()
     {
         try
@@ -38,6 +60,31 @@
                 .Split("\n")
                 .Where(x => !string.IsNullOrWhiteSpace(x))
                 .ToList();
+
+            foreach (var line in Input)
+            {
+                var parts = line.Split("-");
+                var a = parts[0];
+                var b = parts[1];
+
+                if (Connections.ContainsKey(a))
+                {
+                    Connections[a].Add(b);
+                }
+                else
+                {
+                    Connections.Add(a, new List<string> { b });
+                }
+
+                if (Connections.ContainsKey(b))
+                {
+                    Connections[b].Add(a);
+                }
+                else
+                {
+                    Connections.Add(b, new List<string> { a });
+                }
+            }
         }
         catch (Exception e)
         {
@@ -47,6 +94,24 @@
 
     private void Part1()
     {
+        Parties = new List<List<string>>();
+        foreach (var connection in Connections)
+        {
+            var host = connection.Key;
+            var networks = connection
+                .Value
+                .Where(x => Connections[x].Any(y => Connections[y].Contains(host)))
+                .ToList();
+            var party = networks.Prepend(host).Order().ToList();
+            if (party.Any(x => x.StartsWith("t")))
+            {
+                Parties.Add(party);
+            }
+        }
+
+        Parties = Parties.DistinctBy(x => string.Join(", ", x)).OrderBy(x => x.First()).ToList();
+
+        Part1Result = Parties.Count;
     }
 
     private void Part2()

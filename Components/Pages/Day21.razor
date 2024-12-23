@@ -1,10 +1,10 @@
-﻿@page "/21"
+﻿@page "/day21"
 @inject IWebHostEnvironment WebHostEnvironment
 
 <PageTitle>Day @DayNumber</PageTitle>
 
 <div class="container-fluid">
-    <div class="d-flex justify-content-between">
+    <div class="d-flex justify-content-between mb-2">
         <h1>Day @DayNumber</h1>
 
         <div class="d-flex justify-content-around gap-4 flex-grow-1">
@@ -18,6 +18,87 @@
         </div>
     </div>
 
+    <div class="d-flex flex-row justify-content-start mb-2 gap-4">
+        <div class="d-flex flex-column justify-content-start mb-2 p-2 border">
+            @foreach (var (i, c) in InstructionsPerCode.Index())
+            {
+                <p>Code @i (@(new string(Codes[i].Take(3).ToArray())) * @c.Count = @GetComplexity(c, Codes[i])): <span>@(new string(c.ToArray()))</span></p>
+            }
+        </div>
+        <div class="d-flex flex-column justify-content-start mb-2 p-2 border">
+            <p>Instructions: <span>@(new string(Instructions.ToArray()))</span></p>
+            <p>(@DirectionalButton2) Direction2Presses: <span>@(new string(Direction2Presses.ToArray()))</span></p>
+            <p>(@DirectionalButton1) Direction1Presses: <span>@(new string(Direction1Presses.ToArray()))</span></p>
+            <p>(@NumericButton) NumericPresses: <span>@(new string(NumericPresses.ToArray()))</span></p>
+        </div>
+    </div>
+
+    <div class="d-flex flex-row gap-4 mx-2" style="font-family: Consolas">
+        <div class="d-flex flex-column">
+            <h5>Codes</h5>
+            @foreach (var line in Codes)
+            {
+                <p class="my-0">
+                    @foreach (var c in line)
+                    {
+                        <span>@c</span>
+                    }
+                </p>
+            }
+        </div>
+
+        <div class="d-flex flex-column">
+            <h5>Numeric (@NumericButton)</h5>
+            <table class="table table-sm table-bordered">
+                <tbody>
+                @for (var row = 0; row <= NumericKeypad.Keys.Max(x => x.Y); row++)
+                {
+                    <tr>
+                        @for (var col = 0; col <= NumericKeypad.Keys.Max(x => x.X); col++)
+                        {
+                            <td class="text-center @(NumericButton == NumericKeypad[(col, row)] ? "table-danger" : string.Empty)">@NumericKeypad[(col, row)]</td>
+                        }
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </div>
+
+        <div class="d-flex flex-column">
+            <h5>Directional 1 (@DirectionalButton1)</h5>
+            <table class="table table-sm table-bordered">
+                <tbody>
+                @for (var row = 0; row <= DirectionKeypad1.Keys.Max(x => x.Y); row++)
+                {
+                    <tr>
+                        @for (var col = 0; col <= DirectionKeypad1.Keys.Max(x => x.X); col++)
+                        {
+                            <td class="text-center @(DirectionalButton1 == DirectionKeypad1[(col, row)] ? "table-danger" : string.Empty)">@DirectionKeypad1[(col, row)]</td>
+                        }
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </div>
+
+        <div class="d-flex flex-column">
+            <h5>Directional 2 (@DirectionalButton2)</h5>
+            <table class="table table-sm table-bordered">
+                <tbody>
+                @for (var row = 0; row <= DirectionKeypad2.Keys.Max(x => x.Y); row++)
+                {
+                    <tr>
+                        @for (var col = 0; col <= DirectionKeypad2.Keys.Max(x => x.X); col++)
+                        {
+                            <td class="text-center @(DirectionalButton2 == DirectionKeypad2[(col, row)] ? "table-danger" : string.Empty)">@DirectionKeypad2[(col, row)]</td>
+                        }
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </div>
+    </div>
+
 </div>
 
 @code {
@@ -27,6 +108,34 @@
     private long Part2Result { get; set; } = 0;
 
     private List<string> Input = new();
+
+    private List<List<char>> Codes = new();
+
+    private Dictionary<(int X, int Y), char> NumericKeypad = new();
+    private (int X, int Y) NumericPosition = (2, 3);
+    private char NumericButton => NumericKeypad[NumericPosition];
+
+    private Dictionary<(int X, int Y), char> DirectionKeypad1 = new();
+    private (int X, int Y) DirectionalPosition1 = (2, 0);
+    private char DirectionalButton1 => DirectionKeypad1[DirectionalPosition1];
+
+    private Dictionary<(int X, int Y), char> DirectionKeypad2 = new();
+    private (int X, int Y) DirectionalPosition2 = (2, 0);
+    private char DirectionalButton2 => DirectionKeypad2[DirectionalPosition2];
+
+    private const char UpChar = '^';
+    private const char DownChar = 'v';
+    private const char LeftChar = '<';
+    private const char RightChar = '>';
+    private const char ActivateChar = 'A';
+
+    private List<char> NumericPresses = new();
+    private List<char> Direction1Presses = new();
+    private List<char> Direction2Presses = new();
+    private List<char> Instructions = new();
+    private List<List<char>> InstructionsPerCode = new();
+
+    private int Delay = 25;
 
     protected override void OnInitialized()
     {
@@ -38,6 +147,8 @@
                 .Split("\n")
                 .Where(x => !string.IsNullOrWhiteSpace(x))
                 .ToList();
+
+            Init();
         }
         catch (Exception e)
         {
@@ -45,11 +156,369 @@
         }
     }
 
-    private void Part1()
+    private void Init()
     {
+        Codes = Input.Select(x => x.ToList()).ToList();
+        NumericKeypad = new Dictionary<(int X, int Y), char>
+        {
+            {(0, 0), '7'},
+            {(1, 0), '8'},
+            {(2, 0), '9'},
+            {(0, 1), '4'},
+            {(1, 1), '5'},
+            {(2, 1), '6'},
+            {(0, 2), '1'},
+            {(1, 2), '2'},
+            {(2, 2), '3'},
+            {(0, 3), ' '},
+            {(1, 3), '0'},
+            {(2, 3), ActivateChar},
+        };
+        DirectionKeypad1 = new Dictionary<(int X, int Y), char>
+        {
+            {(0, 0), ' '},
+            {(1, 0), UpChar},
+            {(2, 0), ActivateChar},
+            {(0, 1), LeftChar},
+            {(1, 1), DownChar},
+            {(2, 1), RightChar},
+        };
+        DirectionKeypad2 = new Dictionary<(int X, int Y), char>
+        {
+            {(0, 0), ' '},
+            {(1, 0), UpChar},
+            {(2, 0), ActivateChar},
+            {(0, 1), LeftChar},
+            {(1, 1), DownChar},
+            {(2, 1), RightChar},
+        };
+        NumericPosition = (2, 3);
+        DirectionalPosition1 = (2, 0);
+        DirectionalPosition2 = (2, 0);
+        NumericPresses = new();
+        Direction1Presses = new();
+        Direction2Presses = new();
+        Instructions = new();
     }
 
-    private void Part2()
+    private async Task Part1()
     {
+        Init();
+
+        Codes =
+        [
+            new List<char> { '0', '2', '9', 'A', },
+            new List<char> { '9', '8', '0', 'A', },
+            new List<char> { '1', '7', '9', 'A', },
+            new List<char> { '4', '5', '6', 'A', },
+            new List<char> { '3', '7', '9', 'A', },
+        ];
+
+        foreach (var code in Codes)
+        {
+            foreach (var c in code)
+            {
+                await MoveNumericButton(c);
+            }
+
+            InstructionsPerCode.Add(Instructions);
+            NumericPosition = (2, 3);
+            DirectionalPosition1 = (2, 0);
+            DirectionalPosition2 = (2, 0);
+            NumericPresses = new();
+            Direction1Presses = new();
+            Direction2Presses = new();
+            Instructions = new();
+        }
+
+        Part1Result = InstructionsPerCode
+            .Index()
+            .Sum(x => GetComplexity(x.Item, Codes[x.Index]));
+    }
+
+    private async Task Part2()
+    {
+        Init();
+
+        Codes =
+        [
+            new List<char> { '0', '2', '9', 'A', },
+            new List<char> { '9', '8', '0', 'A', },
+            new List<char> { '1', '7', '9', 'A', },
+            new List<char> { '4', '5', '6', 'A', },
+            new List<char> { '3', '7', '9', 'A', },
+        ];
+
+        var instructions = new List<char>
+        {
+            '<', 'v', '<', 'A', '>', '>', '^', 'A', 'v', 'A', '^', 'A', '<', 'v', 'A', '<', 'A', 'A', '>', '>', '^', 'A', 'A', 'v', 'A', '<', '^', 'A', '>', 'A', 'A', 'v', 'A', '^', 'A', '<', 'v', 'A', '>', '^', 'A', 'A', '<', 'A', '>', 'A', '<', 'v', '<', 'A', '>', 'A', '>', '^', 'A', 'A', 'A', 'v', 'A', '<', '^', 'A', '>', 'A',
+        };
+
+        foreach (var c in instructions)
+        {
+            await AddInstruction(c);
+        }
+
+        InstructionsPerCode.Add(instructions);
+        Part2Result = InstructionsPerCode.Sum(x => GetComplexity(x, Codes[0]));
+    }
+
+    private long GetComplexity(List<char> instructions, List<char> code) => instructions.Count * int.Parse(new string(code.Take(3).ToArray()));
+
+    private async Task MoveNumericButton(char number)
+    {
+        var current = NumericPosition;
+        var target = NumericKeypad.FirstOrDefault(x => x.Value == number).Key;
+
+        var requiredMoves = new List<char>();
+
+        if (target.X > current.X)
+        {
+            requiredMoves.AddRange(Enumerable.Repeat(RightChar, target.X - current.X));
+        }
+        if (target.Y > current.Y)
+        {
+            requiredMoves.AddRange(Enumerable.Repeat(DownChar, target.Y - current.Y));
+        }
+        if (target.Y < current.Y)
+        {
+            requiredMoves.AddRange(Enumerable.Repeat(UpChar, current.Y - target.Y));
+        }
+        if (target.X < current.X)
+        {
+            requiredMoves.AddRange(Enumerable.Repeat(LeftChar, current.X - target.X));
+        }
+
+        requiredMoves = requiredMoves
+            .OrderBy(x => AdjacentToDirectionButton1().Contains(x))
+            .ToList();
+
+        while (requiredMoves.Any())
+        {
+            var move = requiredMoves.First();
+                await MoveDirection2(move);
+                requiredMoves.Remove(move);
+        }
+
+        await MoveDirection1(ActivateChar);
+    }
+
+    private List<char> AdjacentToDirectionButton1()
+    {
+        return DirectionalButton1 switch
+        {
+            UpChar => new List<char> { DownChar, ActivateChar },
+            DownChar => new List<char> { UpChar, LeftChar, RightChar },
+            LeftChar => new List<char> { DownChar },
+            RightChar => new List<char> { DownChar, ActivateChar },
+            ActivateChar => new List<char> { UpChar, RightChar },
+            _ => new()
+        };
+    }
+
+    private List<char> AdjacentToDirectionButton2()
+    {
+        return DirectionalButton2 switch
+        {
+            UpChar => new List<char> { DownChar, ActivateChar },
+            DownChar => new List<char> { UpChar, LeftChar, RightChar },
+            LeftChar => new List<char> { DownChar },
+            RightChar => new List<char> { DownChar, ActivateChar },
+            ActivateChar => new List<char> { UpChar, RightChar },
+            _ => new()
+        };
+    }
+
+    private async Task MoveDirection1(char direction)
+    {
+        var current = DirectionalPosition1;
+        var target = DirectionKeypad1.FirstOrDefault(x => x.Value == direction).Key;
+
+        var requiredMoves = new List<char>();
+
+        if (target.X > current.X)
+        {
+            requiredMoves.AddRange(Enumerable.Repeat(RightChar, target.X - current.X));
+        }
+        if (target.Y > current.Y)
+        {
+            requiredMoves.AddRange(Enumerable.Repeat(DownChar, target.Y - current.Y));
+        }
+        if (target.Y < current.Y)
+        {
+            requiredMoves.AddRange(Enumerable.Repeat(UpChar, current.Y - target.Y));
+        }
+        if (target.X < current.X)
+        {
+            requiredMoves.AddRange(Enumerable.Repeat(LeftChar, current.X - target.X));
+        }
+
+        requiredMoves = requiredMoves
+            .OrderBy(x => AdjacentToDirectionButton2().Contains(x))
+            .ToList();
+
+        while (requiredMoves.Any())
+        {
+            var move = requiredMoves.First();
+            // var next = GetNextPosition(current, move);
+            // if (DirectionKeypad1[next] != ' ')
+            // {
+                await MoveDirection2(move);
+                requiredMoves.Remove(move);
+            // }
+            // else
+            // {
+            //     requiredMoves.Remove(move);
+            //     requiredMoves.Add(move);
+            // }
+        }
+
+        await MoveDirection2(ActivateChar);
+    }
+
+    private (int X, int Y) GetNextPosition((int X, int Y) current, char direction)
+    {
+        return direction switch
+        {
+            UpChar => (X: current.X, Y: current.Y - 1),
+            DownChar => (X: current.X, Y: current.Y + 1),
+            LeftChar => (X: current.X - 1, Y: current.Y),
+            RightChar => (X: current.X + 1, Y: current.Y),
+            _ => current
+        };
+    }
+
+    private async Task MoveDirection2(char direction)
+    {
+        var current = DirectionalPosition2;
+        var target = DirectionKeypad2.FirstOrDefault(x => x.Value == direction).Key;
+
+        if (target.Y > current.Y)
+        {
+            foreach (var i in Enumerable.Range(0, target.Y - current.Y))
+            {
+                await AddInstruction(DownChar);
+            }
+        }
+
+        if (target.X > current.X)
+        {
+            foreach (var i in Enumerable.Range(0, target.X - current.X))
+            {
+                await AddInstruction(RightChar);
+            }
+        }
+
+        if (target.Y < current.Y)
+        {
+            foreach (var i in Enumerable.Range(0, current.Y - target.Y))
+            {
+                await AddInstruction(UpChar);
+            }
+        }
+        if (target.X < current.X)
+        {
+            foreach (var i in Enumerable.Range(0, current.X - target.X))
+            {
+                await AddInstruction(LeftChar);
+            }
+        }
+
+        await AddInstruction(ActivateChar);
+    }
+
+    private async Task AddInstruction(char instruction)
+    {
+        Instructions.Add(instruction);
+
+        if (instruction == LeftChar)
+        {
+            DirectionalPosition2 = (DirectionalPosition2.X - 1, DirectionalPosition2.Y);
+        }
+        else if (instruction == RightChar)
+        {
+            DirectionalPosition2 = (DirectionalPosition2.X + 1, DirectionalPosition2.Y);
+        }
+        else if (instruction == UpChar)
+        {
+            DirectionalPosition2 = (DirectionalPosition2.X, DirectionalPosition2.Y - 1);
+        }
+        else if (instruction == DownChar)
+        {
+            DirectionalPosition2 = (DirectionalPosition2.X, DirectionalPosition2.Y + 1);
+        }
+        else if (instruction == ActivateChar)
+        {
+            await AddDirection2Instruction(DirectionalButton2);
+        }
+
+        PrintState();
+        await InvokeAsync(StateHasChanged);
+        await Task.Delay(Delay);
+    }
+
+    private async Task AddDirection2Instruction(char instruction)
+    {
+        Direction2Presses.Add(instruction);
+
+        if (instruction == LeftChar)
+        {
+            DirectionalPosition1 = (DirectionalPosition1.X - 1, DirectionalPosition1.Y);
+        }
+        else if (instruction == RightChar)
+        {
+            DirectionalPosition1 = (DirectionalPosition1.X + 1, DirectionalPosition1.Y);
+        }
+        else if (instruction == UpChar)
+        {
+            DirectionalPosition1 = (DirectionalPosition1.X, DirectionalPosition1.Y - 1);
+        }
+        else if (instruction == DownChar)
+        {
+            DirectionalPosition1 = (DirectionalPosition1.X, DirectionalPosition1.Y + 1);
+        }
+        else if (instruction == ActivateChar)
+        {
+            await AddDirection1Instruction(DirectionalButton1);
+        }
+    }
+
+    private async Task AddDirection1Instruction(char instruction)
+    {
+        Direction1Presses.Add(instruction);
+
+        if (instruction == LeftChar)
+        {
+            NumericPosition = (NumericPosition.X - 1, NumericPosition.Y);
+        }
+        else if (instruction == RightChar)
+        {
+            NumericPosition = (NumericPosition.X + 1, NumericPosition.Y);
+        }
+        else if (instruction == UpChar)
+        {
+            NumericPosition = (NumericPosition.X, NumericPosition.Y - 1);
+        }
+        else if (instruction == DownChar)
+        {
+            NumericPosition = (NumericPosition.X, NumericPosition.Y + 1);
+        }
+        else if (instruction == ActivateChar)
+        {
+            await AddNumericInstruction(NumericButton);
+        }
+    }
+
+    private async Task AddNumericInstruction(char instruction)
+    {
+        NumericPresses.Add(instruction);
+    }
+
+    private void PrintState()
+    {
+        Console.WriteLine($"\n Instructions: {Instructions.Count}");
+        Console.WriteLine($"NumericPosition: '{NumericButton}' ({NumericPosition.X},{NumericPosition.Y})");
+        Console.WriteLine($"DirectionalButton1: '{DirectionalButton1}' ({DirectionalPosition1.X},{DirectionalPosition1.Y})");
+        Console.WriteLine($"DirectionalButton2: '{DirectionalButton2}' ({DirectionalPosition2.X},{DirectionalPosition2.Y})");
     }
 }

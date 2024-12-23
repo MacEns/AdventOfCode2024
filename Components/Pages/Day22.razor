@@ -1,4 +1,4 @@
-﻿@page "/22"
+﻿@page "/day22"
 @inject IWebHostEnvironment WebHostEnvironment
 
 <PageTitle>Day @DayNumber</PageTitle>
@@ -18,6 +18,23 @@
         </div>
     </div>
 
+    <div class="d-flex justify-content-start gap-4" style="font-family: Consolas">
+        <div class="d-flex flex-column px-2 border">
+            @foreach (var line in Input.Order())
+            {
+                <p class="my-0">@line</p>
+            }
+        </div>
+
+        <div class="d-flex flex-column px-2 border">
+            @foreach (var secret in Secrets)
+            {
+                <p class="my-0">@secret</p>
+            }
+        </div>
+    </div>
+
+
 </div>
 
 @code {
@@ -27,6 +44,8 @@
     private long Part2Result { get; set; } = 0;
 
     private List<string> Input = new();
+
+    private List<long> Secrets = new();
 
     protected override void OnInitialized()
     {
@@ -38,6 +57,7 @@
                 .Split("\n")
                 .Where(x => !string.IsNullOrWhiteSpace(x))
                 .ToList();
+            Secrets = Input.Select(x => long.Parse(x)).ToList();
         }
         catch (Exception e)
         {
@@ -47,9 +67,112 @@
 
     private void Part1()
     {
+        var results = new List<long>();
+
+        foreach (var secret in Secrets)
+        {
+            var result = secret;
+            for (var i = 0; i < 2000; i++)
+            {
+                result = GetNextSecret(result);
+            }
+
+            results.Add(result);
+        }
+
+        Part1Result = results.Sum();
     }
 
     private void Part2()
     {
+        var allPrices = new List<List<long>>();
+
+        foreach (var secret in Secrets)
+        {
+            var priceList = new List<long> { secret };
+            for (var i = 0; i < 2000; i++)
+            {
+                priceList.Add(GetNextSecret(priceList.Last()));
+            }
+
+            allPrices.Add(priceList.Select(x => x % 10).ToList());
+        }
+
+        var priceChanges = allPrices.Select(GetPriceChanges).ToList();
+        var bestSequences = allPrices.SelectMany(FindBestPriceSequence).Distinct().ToList();
+
+        var bestSequence = bestSequences.MaxBy(x => priceChanges.Select(y => y[FindIndexOfSequence(y, x) + 4].Price));
+
+        Part2Result = priceChanges.Select(x => FindIndexOfSequence(x, bestSequence) > 0 ? x[FindIndexOfSequence(x, bestSequence) + 4].Price : 0).Sum();
+    }
+
+    private int FindIndexOfSequence(List<(long Price, long Change)> priceChanges, List<long> sequence)
+    {
+        for (var i = 0; i < priceChanges.Count - sequence.Count; i++)
+        {
+            if (sequence.SequenceEqual(priceChanges.Skip(i).Take(sequence.Count).Select(x => x.Change)))
+            {
+                return i;
+            }
+        }
+
+        return -1;
+    }
+
+    private List<List<long>> FindBestPriceSequence(List<long> prices)
+    {
+        var priceWithChanges = GetPriceChanges(prices);
+
+        var maxPrice = prices.Max();
+        return priceWithChanges
+            .Select((x, i) => i < 4 ? new List<int>() : new List<int> {i-3, i-2, i-1, i})
+            .Where(x => priceWithChanges[x.First()].Price == maxPrice)
+            .Select(x => x.Select(y => priceWithChanges[y].Change).ToList())
+            .ToList();
+    }
+
+    private List<(long Price, long Change)> GetPriceChanges(List<long> prices)
+    {
+        return prices.Skip(1).Select((y, i) => (Price: y, Change: y - prices[i])).ToList();
+    }
+
+    private long GetNextSecret(long secret)
+    {
+        // Calculate the result of multiplying the secret number by 64. Then, mix this result into the
+        // secret number. Finally, prune the secret number.
+        var result = secret * 64;
+        result = Mix(result, secret);
+        result = Prune(result);
+
+        // Calculate the result of dividing the secret number by 32. Round the result down to the nearest integer.
+        // Then, mix this result into the secret number. Finally, prune the secret number.
+        var result2 = result / 32;
+        result = Mix(result2, result);
+        result = Prune(result);
+
+        // Calculate the result of multiplying the secret number by 2048.
+        // Then, mix this result into the secret number. Finally, prune the secret number.
+        var result3 = result * 2048;
+        result = Mix(result3, result);
+        result = Prune(result);
+
+        return result;
+    }
+
+    private long Mix(long value, long secret)
+    {
+        // Calculate the bitwise XOR of the given value and the secret number.
+        // Then, the secret number becomes the result of that operation.
+        // (If the secret number is 42 and you were to mix 15 into the secret number,
+        // the secret number would become 37.)
+        return value ^ secret;
+    }
+
+    private long Prune(long secret)
+    {
+        // Calculate the value of the secret number modulo 16777216. Then, the secret number
+        // becomes the result of that operation. (If the secret number is 100000000 and you
+        // were to prune the secret number, the secret number would become 16113920.)
+        return secret % 16777216;
     }
 }
